@@ -687,7 +687,7 @@ if (canOverwriteStatus()) {
 
 ### Rubber-Band Scroll
 
-For a native-feeling pull gesture at the edges of the scroll area, implement a pointer-event-based rubber-band effect. See the `attachRubberBand()` function in `examples/cis/usernode_cis.html` for the full implementation.
+For a native-feeling pull gesture at the edges of the scroll area, implement a pointer-event-based rubber-band effect. See the `attachRubberBand()` function in `examples/him/him.html` for the full implementation.
 
 ### Building DOM Safely (No innerHTML for User Content)
 
@@ -814,9 +814,9 @@ function defaultUsername(pubkey) {
 
 ## 9. Survey / Voting Pattern (One Example — Not the Only One)
 
-The CIS example (`examples/cis/usernode_cis.html`) implements a complete survey/voting system as a reference. This is just one type of app — users will want to build all kinds of things: games, chat apps, marketplaces, collaborative tools, etc. Study this example for the patterns, then adapt to whatever the user wants to build.
+The HIM example (`examples/him/him.html`) implements a complete survey/voting system with prediction markets as a reference. This is just one type of app — users will want to build all kinds of things: games, chat apps, marketplaces, collaborative tools, etc. Study this example for the patterns, then adapt to whatever the user wants to build.
 
-Key transaction types in the CIS example:
+Key transaction types in the HIM example:
 
 | `type` | Payload | Rule |
 |--------|---------|------|
@@ -1244,7 +1244,7 @@ This means:
 All example dapps are deployed together from a single `examples/server.js` and a single Docker container. This combined server hosts:
 
 - `/` — dapp-starter demo (`index.html`)
-- `/cis` — Collective Intelligence Service (`cis/usernode_cis.html`)
+- `/him` — Human Input Market (`him/him.html`; also `/cis` for backward compat)
 - `/falling-sands` — Falling Sands (`falling-sands/index.html`)
 - `/last-one-wins` — Last One Wins token game (`last-one-wins/index.html`)
 - `/__game/state` — Last One Wins game state API (JSON)
@@ -1339,19 +1339,10 @@ const BRIDGE_PATH = (() => {
     ├── package.json               # Dependencies (ws)
     ├── lib/
     │   └── dapp-server.js         # Shared server utilities (mock API, explorer proxy, chain poller)
-    ├── cis/
-    │   ├── usernode_cis.html      # Reference: Collective Intelligence Service
-    │   ├── README.md
-    │   └── bot/                   # AI survey bot (LLM-powered participant)
-    │       ├── index.js           # Bot entry point
-    │       ├── cis-client.js      # CIS transaction client
-    │       ├── llm.js             # LLM integration
-    │       ├── search.js          # Web search for survey context
-    │       ├── image-store/       # Image hosting sidecar
-    │       ├── Dockerfile
-    │       ├── docker-compose.yml
-    │       ├── package.json
-    │       └── env.example        # Template for .env (secrets)
+    ├── him/
+    │   ├── him.html               # Human Input Market (prediction-market-powered surveys)
+    │   ├── HUMAN_INPUT_MARKET_SPEC.md
+    │   └── README.md
     ├── last-one-wins/
     │   ├── index.html             # Client UI (token game)
     │   ├── game-logic.js          # Shared game state, tx processing, payout logic

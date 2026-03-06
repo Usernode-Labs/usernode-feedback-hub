@@ -27,7 +27,7 @@ COPY usernode-bridge.js ./
 
 # HTML files for all apps
 COPY index.html ./
-COPY cis/usernode_cis.html cis/
+COPY him/him.html him/
 COPY falling-sands/index.html falling-sands/
 COPY last-one-wins/index.html last-one-wins/
 COPY last-one-wins/game-logic.js last-one-wins/

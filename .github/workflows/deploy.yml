@@ -52,13 +52,6 @@ jobs:
             docker compose ps
             echo "==> Combined examples server started."
 
-            echo "==> Rebuilding and restarting CIS bots..."
-            cd "$REPO_DIR/examples/cis/bot"
-            docker compose down || true
-            docker compose up -d --build 2>&1
-            docker compose ps
-            echo "==> CIS bots started."
-
             echo "==> All running containers:"
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo "==> Deploy complete!"
