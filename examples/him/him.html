@@ -299,16 +299,33 @@
       .marketLabel { flex: 1 1 120px; min-width: 0; font-weight: 600; }
       .marketProb { flex: 0 0 50px; text-align: right; font-variant-numeric: tabular-nums; }
       .marketPool { flex: 0 0 70px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-      .marketActions { flex: 0 0 auto; display: flex; gap: 4px; align-items: center; }
+      .marketActions { flex: 1 0 100%; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+      .feeHint { font-size: 11px; color: var(--muted); white-space: nowrap; }
+      .betPreview { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+      .betPreview .ok { color: var(--ok); }
 
       .positionRow {
         font-size: 12px;
         color: var(--muted);
-        padding: 2px 0 4px;
+        padding: 4px 8px;
         display: flex;
         gap: 12px;
         flex-wrap: wrap;
+        background: color-mix(in oklab, var(--accent) 5%, transparent);
+        border-radius: 8px;
+        margin: 2px 0 4px;
       }
+      .maxBtn {
+        appearance: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 2px 6px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .maxBtn:hover { border-color: var(--accent); color: var(--accent); }
 
       .settledWinner {
         border-left: 3px solid var(--ok);
@@ -399,6 +416,7 @@
                 User: <code id="headerUsername">(loading...)</code>
               </button>
               <button class="btn small hide" id="leaderboardBtn" type="button" title="Leaderboard">&#x1F3C6;</button>
+              <button class="btn small" id="infoBtn" type="button" title="How it works">&#x2753;</button>
               <button class="btn" id="backBtn" style="display: none;">Back</button>
             </div>
           </div>
@@ -447,7 +465,7 @@
               <div class="panel hide" id="addSurveyPanel" style="margin-top: 10px;">
                 <h3>Create question</h3>
                 <div id="surveyCooldownHint" class="muted hide" style="font-size: 12px; margin-bottom: 8px;"></div>
-                <div class="muted" style="font-size: 12px; margin-bottom: 8px;">You can create up to 3 questions every 24 hours.</div>
+                <div class="muted" style="font-size: 12px; margin-bottom: 8px;">Costs 50 credits to seed the betting pool. You earn 0.5% of trading volume back (up to 100).</div>
                 <label style="display: grid; gap: 6px; margin-top: 8px;">
                   <span class="muted" style="font-size: 13px;">Title</span>
                   <input id="newSurveyTitle" class="input" maxlength="80" />
@@ -465,6 +483,7 @@
                   <span class="muted" style="font-size: 13px;">Active for</span>
                   <select id="newSurveyDuration" class="input">
                     <option value="60000">1 minute (testing)</option>
+                    <option value="600000">10 minutes (testing)</option>
                     <option value="172800000">2 days</option>
                     <option value="259200000">3 days</option>
                     <option value="345600000">4 days</option>
@@ -522,6 +541,7 @@
               <p style="margin-top: 0;" id="surveyQuestion"></p>
               <div id="surveyCreatedBy" class="muted" style="font-size: 11px; margin: 6px 0;"></div>
               <div id="surveyRevealInfo" class="revealNotice hide" style="margin: 8px 0;"></div>
+              <button class="btn small hide" id="resolveEarlyBtn" type="button" style="margin-top: 8px; color: var(--warn); border-color: var(--warn);">&#x23F1; Resolve early (testing)</button>
 
               <hr class="sectionDivider" />
 
@@ -583,6 +603,84 @@
               <p class="muted" style="font-size: 13px; margin: 0 0 12px;">Lifetime earnings from correct predictions.</p>
               <div id="leaderboardContent"></div>
             </div>
+
+            <!-- How it works -->
+            <div class="panel hide" id="screenInfo">
+              <h2 style="margin-bottom: 12px;">How It Works</h2>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">The idea</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                Human Input Market lets you <strong>vote</strong> on questions and <strong>bet</strong> on what the crowd will choose.
+                The gap between votes (what people genuinely believe) and bets (what people think others believe) reveals collective intelligence.
+              </p>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">Credits</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                When you join, you get <strong>1,000 credits</strong>. Credits are the currency for betting and creating questions.
+                You spend credits to buy into outcomes, and earn credits when your predictions are correct.
+              </p>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">Voting vs. betting</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                <strong>Voting</strong> is free and private &mdash; express your honest opinion. Votes may be hidden until periodic reveals or until the question ends.
+              </p>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                <strong>Betting</strong> costs credits. When you buy into an option, the price moves &mdash; popular options cost more per credit.
+                Buying early on a less popular option gives you a bigger potential payout.
+              </p>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">Creating questions</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                Creating a question costs <strong>50 credits</strong>, which seed the initial betting pool equally across all options.
+                This gives early bettors something to trade against and makes the market functional from the start.
+              </p>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                As compensation, the creator earns <strong>0.5% of all trading volume</strong> on their question, up to a cap of 100 credits.
+                A popular question can more than pay for itself.
+              </p>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">Buying &amp; selling</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                <strong>Buy:</strong> Enter the credits you want to bet. The app shows your potential payout if that option wins.
+                A 5% fee supports voter rewards and the question creator.
+              </p>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                <strong>Cash out:</strong> Changed your mind? Enter the credits you want back and the app handles the rest.
+                You can cash out anytime before the question ends.
+              </p>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">Settlement</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                When a question ends, votes are counted. The option with the most votes wins.
+                The entire betting pool (including the creator's initial seed) is split among people who bet on the winner, proportional to how much they invested.
+                The voter fee pool is distributed equally to everyone who voted.
+              </p>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">Probabilities</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                Each option shows a percentage &mdash; this is the market's implied probability based on how much has been bet.
+                If 70% of the pool is on "Yes", the market thinks "Yes" has a 70% chance of winning the vote.
+              </p>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">Position &amp; value</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 4px;">
+                Your position shows two numbers:
+              </p>
+              <ul style="font-size: 13px; line-height: 1.6; margin: 0 0 12px; padding-left: 20px;">
+                <li><strong>Value</strong> &mdash; what you'd get if you cashed out now (before fees)</li>
+                <li><strong>Payout if wins</strong> &mdash; what you'd receive at settlement if your option wins the vote</li>
+              </ul>
+
+              <h3 style="margin: 16px 0 6px; font-size: 15px;">Leaderboard</h3>
+              <p style="font-size: 13px; line-height: 1.5; margin: 0 0 12px;">
+                Tracks lifetime earnings from correct predictions across all settled markets.
+                Profit = payouts received + cash-outs + voter dividends &minus; credits bet.
+              </p>
+
+              <p class="muted" style="font-size: 12px; margin: 16px 0 0; border-top: 1px solid var(--border); padding-top: 12px;">
+                All data lives on the Usernode blockchain. There is no central server &mdash; every participant sees the same state derived from the same transactions.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -643,6 +741,9 @@
         const INITIAL_CREDITS = 1000;
         const FEE_RATE = 0.05;
         const EXIT_CAP_RATIO = 0.01;
+        const MARKET_ANTE = 50;
+        const CREATOR_REWARD_RATE = 0.005;
+        const CREATOR_REWARD_CAP = 100;
         let chainId = null;
 
         /* ================================================================
@@ -736,7 +837,7 @@
          *  SURVEY DEFINITION
          * ================================================================ */
         const ALLOWED_SURVEY_DURATION_MS = new Set([
-          60_000,
+          60_000, 600_000,
           2*86400000, 3*86400000, 4*86400000, 5*86400000, 6*86400000, 7*86400000,
           14*86400000, 30*86400000, 90*86400000,
         ]);
@@ -822,12 +923,12 @@
           if (!me || !JOINED.has(me)) return 0;
           const f = CREDIT_FLOWS.get(me);
           if (!f) return INITIAL_CREDITS;
-          return INITIAL_CREDITS - f.grossBets + f.netSells + f.payouts + f.dividends;
+          return INITIAL_CREDITS - f.antes - f.grossBets + f.netSells + f.payouts + f.dividends + f.creatorRewards;
         }
 
         function getCreditFlow(pubkey) {
           let f = CREDIT_FLOWS.get(pubkey);
-          if (!f) { f = { grossBets: 0, netSells: 0, payouts: 0, dividends: 0 }; CREDIT_FLOWS.set(pubkey, f); }
+          if (!f) { f = { antes: 0, grossBets: 0, netSells: 0, payouts: 0, dividends: 0, creatorRewards: 0 }; CREDIT_FLOWS.set(pubkey, f); }
           return f;
         }
 
@@ -835,14 +936,14 @@
           if (!JOINED.has(pubkey)) return 0;
           const f = CREDIT_FLOWS.get(pubkey);
           if (!f) return INITIAL_CREDITS;
-          return INITIAL_CREDITS - f.grossBets + f.netSells + f.payouts + f.dividends;
+          return INITIAL_CREDITS - f.antes - f.grossBets + f.netSells + f.payouts + f.dividends + f.creatorRewards;
         }
 
         /* ================================================================
          *  STATE REBUILD
          * ================================================================ */
         const SURVEY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-        const MAX_SURVEYS_PER_WINDOW = 3;
+        const MAX_SURVEYS_PER_WINDOW = 999;
 
         function rebuildState(rawTxs) {
           const parsed = [];
@@ -895,11 +996,23 @@
               latestCreated.set(entry.survey.id, { survey: entry.survey, ts: entry.ts, from: entry.from });
             }
           }
+          // Scan for resolve_early txs (earliest per survey wins)
+          const earlyResolves = new Map();
+          for (const { tx, memo } of parsed) {
+            if (memo.type !== "resolve_early") continue;
+            const sv = memo.survey == null ? null : String(memo.survey);
+            if (!sv) continue;
+            const prev = earlyResolves.get(sv);
+            if (!prev || tx.ts < prev) earlyResolves.set(sv, tx.ts);
+          }
+
           const now = Date.now();
           SURVEYS = Array.from(latestCreated.values())
             .sort((a, b) => b.ts - a.ts)
             .map(x => {
-              const expiresAtMs = x.ts + x.survey.activeDurationMs;
+              let expiresAtMs = x.ts + x.survey.activeDurationMs;
+              const earlyResolve = earlyResolves.get(x.survey.id);
+              if (earlyResolve && earlyResolve < expiresAtMs) expiresAtMs = earlyResolve;
               return {
                 ...x.survey,
                 createdBy: x.from,
@@ -956,6 +1069,25 @@
             if (!prev || tx.ts >= prev.ts) voteMap.set(k, { from: tx.from, survey: sv, choice: ch, ts: tx.ts });
           }
 
+          // --- Phase 5b: Seed markets from creator ante ---
+          for (const survey of SURVEYS) {
+            if (!survey.createdBy || !JOINED.has(survey.createdBy)) continue;
+            if (userBalance(survey.createdBy) < MARKET_ANTE) continue;
+            const numOpts = survey.options.length;
+            if (numOpts < 2) continue;
+            const perOpt = MARKET_ANTE / numOpts;
+            const mkt = { pools: {}, totalShares: {}, userShares: {}, feePool: 0, totalPool: 0, grossBetsByUser: {}, netSellsByUser: {}, creatorReward: 0, creator: survey.createdBy };
+            mkt.userShares[survey.createdBy] = {};
+            for (const opt of survey.options) {
+              mkt.pools[opt.key] = perOpt;
+              mkt.totalShares[opt.key] = perOpt;
+              mkt.userShares[survey.createdBy][opt.key] = perOpt;
+            }
+            mkt.totalPool = MARKET_ANTE;
+            MARKETS.set(survey.id, mkt);
+            getCreditFlow(survey.createdBy).antes += MARKET_ANTE;
+          }
+
           // --- Phase 6: Market operations (chronological replay) ---
           for (const { tx, memo } of parsed) {
             if (memo.type !== "place_bet" && memo.type !== "sell_shares") continue;
@@ -969,7 +1101,7 @@
 
             let mkt = MARKETS.get(sv);
             if (!mkt) {
-              mkt = { pools: {}, totalShares: {}, userShares: {}, feePool: 0, totalPool: 0, grossBetsByUser: {}, netSellsByUser: {} };
+              mkt = { pools: {}, totalShares: {}, userShares: {}, feePool: 0, totalPool: 0, grossBetsByUser: {}, netSellsByUser: {}, creatorReward: 0, creator: null };
               MARKETS.set(sv, mkt);
             }
 
@@ -980,6 +1112,8 @@
               if (bal < credits) continue;
 
               const fee = credits * FEE_RATE;
+              const creatorCut = Math.min(credits * CREATOR_REWARD_RATE, CREATOR_REWARD_CAP - mkt.creatorReward);
+              const voterFee = fee - Math.max(0, creatorCut);
               const net = credits - fee;
               const poolBefore = mkt.pools[optKey] || 0;
               const totalBefore = mkt.totalPool;
@@ -995,7 +1129,11 @@
               mkt.totalShares[optKey] = (mkt.totalShares[optKey] || 0) + shares;
               if (!mkt.userShares[tx.from]) mkt.userShares[tx.from] = {};
               mkt.userShares[tx.from][optKey] = (mkt.userShares[tx.from][optKey] || 0) + shares;
-              mkt.feePool += fee;
+              mkt.feePool += voterFee;
+              if (creatorCut > 0) {
+                mkt.creatorReward += creatorCut;
+                if (mkt.creator) getCreditFlow(mkt.creator).creatorRewards += creatorCut;
+              }
 
               mkt.grossBetsByUser[tx.from] = (mkt.grossBetsByUser[tx.from] || 0) + credits;
               getCreditFlow(tx.from).grossBets += credits;
@@ -1014,13 +1152,19 @@
               if (poolBefore - grossCredits < minPool) continue;
 
               const fee = grossCredits * FEE_RATE;
+              const creatorCut = Math.min(grossCredits * CREATOR_REWARD_RATE, CREATOR_REWARD_CAP - mkt.creatorReward);
+              const voterFee = fee - Math.max(0, creatorCut);
               const netCredits = grossCredits - fee;
 
               mkt.pools[optKey] = poolBefore - grossCredits;
               mkt.totalPool -= grossCredits;
               mkt.totalShares[optKey] = totalSharesBefore - sharesToSell;
               mkt.userShares[tx.from][optKey] = userHeld - sharesToSell;
-              mkt.feePool += fee;
+              mkt.feePool += voterFee;
+              if (creatorCut > 0) {
+                mkt.creatorReward += creatorCut;
+                if (mkt.creator) getCreditFlow(mkt.creator).creatorRewards += creatorCut;
+              }
 
               mkt.netSellsByUser[tx.from] = (mkt.netSellsByUser[tx.from] || 0) + netCredits;
               getCreditFlow(tx.from).netSells += netCredits;
@@ -1110,7 +1254,7 @@
             SETTLEMENTS.set(survey.id, settlement);
           }
 
-          // --- Phase 8: Leaderboard (prediction earnings only) ---
+          // --- Phase 8: Leaderboard (includes dividends) ---
           const earningsMap = new Map();
           for (const survey of SURVEYS) {
             if (!survey.archived) continue;
@@ -1118,12 +1262,14 @@
             if (!mkt || mkt.totalPool <= 0) continue;
             const settlement = SETTLEMENTS.get(survey.id);
             if (!settlement) continue;
+            const dividend = settlement.voterDividendPer || 0;
             for (const pubkey of Object.keys(mkt.grossBetsByUser)) {
               const grossBet = mkt.grossBetsByUser[pubkey] || 0;
               if (grossBet <= 0) continue;
               const netSells = mkt.netSellsByUser[pubkey] || 0;
               const payout = settlement.payouts[pubkey] || 0;
-              const profit = payout + netSells - grossBet;
+              const div = (settlement.voterCount > 0 && voteMap.has(pubkey + ":" + survey.id)) ? dividend : 0;
+              const profit = payout + netSells + div - grossBet;
               const shares = mkt.userShares[pubkey] || {};
               const hadWinningShares = settlement.winner && (shares[settlement.winner] || 0) > 0;
               let e = earningsMap.get(pubkey);
@@ -1320,7 +1466,12 @@
           return year === new Date().getFullYear() ? `Archived ${mon} ${day}` : `Archived ${mon} ${day}, ${year}`;
         }
 
-        function formatCredits(n) { return Math.round(n).toLocaleString(); }
+        function formatCredits(n) {
+          const v = Number(n);
+          if (!Number.isFinite(v)) return "0";
+          if (v === Math.round(v)) return v.toLocaleString();
+          return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
 
         function formatPct(n) { return (n * 100).toFixed(1) + "%"; }
 
@@ -1691,6 +1842,7 @@
         async function createSurveyFlow() {
           if (isSurveyCooldownActive()) throw new Error(`Please wait ${formatCooldownRemaining() || "some time"} before creating another question.`);
           if (me && !JOINED.has(me)) throw new Error("Join first to create questions");
+          if (myCredits() < MARKET_ANTE) throw new Error(`You need at least ${MARKET_ANTE} credits to create a question (${MARKET_ANTE} goes to seed the betting pool).`);
           const survey = createSurveyFromForm();
           const memo = makeMemo({
             app: "him",
@@ -1708,17 +1860,37 @@
           await refreshLoopOnce();
         }
 
+        async function resolveEarlyFlow(surveyId) {
+          const s = SURVEYS.find(x => x.id === surveyId);
+          if (!s) throw new Error("Question not found");
+          if (s.archived) throw new Error("Question already ended");
+          setSending(true);
+          showPending("votePending", "Resolving...");
+          const memo = makeMemo({ app: "him", type: "resolve_early", survey: surveyId });
+          await sendTransaction(APP_PUBKEY, 1, memo, TX_SEND_OPTS);
+          await refreshLoopOnce();
+        }
+
         /* ================================================================
          *  NAVIGATION
          * ================================================================ */
+        function syncHash() {
+          if (currentSurveyId) history.replaceState(null, "", "#survey/" + encodeURIComponent(currentSurveyId));
+          else if ($("screenLeaderboard") && !$("screenLeaderboard").classList.contains("hide")) history.replaceState(null, "", "#leaderboard");
+          else if ($("screenInfo") && !$("screenInfo").classList.contains("hide")) history.replaceState(null, "", "#info");
+          else if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+        }
+
         function navigateToList() {
           currentSurveyId = null;
           show($("screenActiveList"), true);
           show($("screenArchivedList"), SURVEYS.some(s => s.archived));
           show($("screenSurvey"), false);
           show($("screenLeaderboard"), false);
+          show($("screenInfo"), false);
           const bb = $("backBtn"); if (bb) bb.style.display = "none";
           updateCreditsDisplay();
+          syncHash();
         }
 
         function navigateToSurvey(id) {
@@ -1729,6 +1901,7 @@
           show($("screenArchivedList"), false);
           show($("screenSurvey"), true);
           show($("screenLeaderboard"), false);
+          show($("screenInfo"), false);
           const bb = $("backBtn"); if (bb) bb.style.display = "";
           setText($("surveyTitle"), s.title);
           setText($("surveyQuestion"), s.question);
@@ -1757,6 +1930,9 @@
           // Countdown
           updateSurveyCountdown(s);
 
+          // Resolve early button (testing)
+          show($("resolveEarlyBtn"), !s.archived);
+
           // Add option button
           const addOptBtn = $("addOptionToggleBtn");
           if (addOptBtn) {
@@ -1769,6 +1945,7 @@
           setDisabled($("saveOptionBtn"), s.archived);
 
           updateCreditsDisplay();
+          syncHash();
         }
 
         function navigateToLeaderboard() {
@@ -1777,8 +1954,21 @@
           show($("screenArchivedList"), false);
           show($("screenSurvey"), false);
           show($("screenLeaderboard"), true);
+          show($("screenInfo"), false);
           const bb = $("backBtn"); if (bb) bb.style.display = "";
           renderLeaderboard();
+          syncHash();
+        }
+
+        function navigateToInfo() {
+          currentSurveyId = null;
+          show($("screenActiveList"), false);
+          show($("screenArchivedList"), false);
+          show($("screenSurvey"), false);
+          show($("screenLeaderboard"), false);
+          show($("screenInfo"), true);
+          const bb = $("backBtn"); if (bb) bb.style.display = "";
+          syncHash();
         }
 
         function updateSurveyCountdown(s) {
@@ -1820,7 +2010,10 @@
 
           const active = SURVEYS.filter(s => !s.archived);
           const archived = SURVEYS.filter(s => s.archived);
-          if (!currentSurveyId) show($("screenArchivedList"), archived.length > 0);
+          const onList = !currentSurveyId
+            && (!$("screenLeaderboard") || $("screenLeaderboard").classList.contains("hide"))
+            && (!$("screenInfo") || $("screenInfo").classList.contains("hide"));
+          if (onList) show($("screenArchivedList"), archived.length > 0);
 
           if (!active.length) {
             const e = document.createElement("div");
@@ -1855,7 +2048,7 @@
             if (mkt && mkt.totalPool > 0) {
               const mb = document.createElement("span");
               mb.className = "badge accent";
-              mb.textContent = formatCredits(Math.round(mkt.totalPool)) + " in market";
+              mb.textContent = formatCredits(mkt.totalPool) + " in market";
               badges.appendChild(mb);
             }
             // Reveal badge
@@ -1909,9 +2102,12 @@
           const mkt = MARKETS.get(s.id);
           const settlement = SETTLEMENTS.get(s.id);
 
+          const _focusEl = document.activeElement;
+          const _isFocusedInput = _focusEl && (_focusEl.tagName === "INPUT" || _focusEl.tagName === "TEXTAREA");
+
           // --- Vote options ---
           const voteList = $("voteOptionsList");
-          if (voteList) {
+          if (voteList && !(_isFocusedInput && voteList.contains(_focusEl))) {
             voteList.textContent = "";
             if (s.options.length === 0) {
               const e = document.createElement("p");
@@ -2019,30 +2215,38 @@
 
           // --- Market section ---
           const marketContent = $("marketContent");
-          if (marketContent) {
+          if (marketContent && !(_isFocusedInput && marketContent.contains(_focusEl))) {
             marketContent.textContent = "";
+            const hasMarket = mkt && mkt.totalPool > 0;
+            const canBet = !s.archived && JOINED.has(me);
+            const totalPool = hasMarket ? mkt.totalPool : 0;
 
-            if (!mkt || mkt.totalPool <= 0) {
-              if (!s.archived) {
-                const p = document.createElement("p");
-                p.className = "muted";
-                p.style.fontSize = "13px";
-                p.textContent = JOINED.has(me) ? "No bets yet. Be the first to bet on an option!" : "Join to start betting on outcomes.";
-                marketContent.appendChild(p);
-              } else {
-                const p = document.createElement("p");
-                p.className = "muted";
-                p.style.fontSize = "13px";
-                p.textContent = "No market activity for this question.";
-                marketContent.appendChild(p);
-              }
+            if (s.archived && !hasMarket) {
+              const p = document.createElement("p");
+              p.className = "muted";
+              p.style.fontSize = "13px";
+              p.textContent = "No market activity for this question.";
+              marketContent.appendChild(p);
+            } else if (!canBet && !hasMarket) {
+              const p = document.createElement("p");
+              p.className = "muted";
+              p.style.fontSize = "13px";
+              p.textContent = "Join to start betting on outcomes.";
+              marketContent.appendChild(p);
             } else {
-              const totalPool = mkt.totalPool;
+              if (!hasMarket) {
+                const hint = document.createElement("p");
+                hint.className = "muted";
+                hint.style.fontSize = "13px";
+                hint.textContent = "No bets yet \u2014 place the first bet to set the opening odds.";
+                marketContent.appendChild(hint);
+              }
+
               for (const opt of s.options) {
-                const pool = mkt.pools[opt.key] || 0;
+                const pool = hasMarket ? (mkt.pools[opt.key] || 0) : 0;
                 const prob = totalPool > 0 ? pool / totalPool : 0;
-                const totalSh = mkt.totalShares[opt.key] || 0;
-                const myShares = (mkt.userShares[me] && mkt.userShares[me][opt.key]) || 0;
+                const totalSh = hasMarket ? (mkt.totalShares[opt.key] || 0) : 0;
+                const myShares = (hasMarket && mkt.userShares[me] && mkt.userShares[me][opt.key]) || 0;
                 const myValue = totalSh > 0 ? myShares * (pool / totalSh) : 0;
                 const potentialPayout = totalSh > 0 ? (myShares / totalSh) * totalPool : 0;
 
@@ -2055,18 +2259,19 @@
                 label.textContent = parsed.text || opt.key;
                 mRow.appendChild(label);
 
-                const probEl = document.createElement("div");
-                probEl.className = "marketProb";
-                probEl.textContent = formatPct(prob);
-                mRow.appendChild(probEl);
+                if (hasMarket) {
+                  const probEl = document.createElement("div");
+                  probEl.className = "marketProb";
+                  probEl.textContent = formatPct(prob);
+                  mRow.appendChild(probEl);
 
-                const poolEl = document.createElement("div");
-                poolEl.className = "marketPool";
-                poolEl.textContent = formatCredits(Math.round(pool)) + " pool";
-                mRow.appendChild(poolEl);
+                  const poolEl = document.createElement("div");
+                  poolEl.className = "marketPool";
+                  poolEl.textContent = formatCredits(pool) + " pool";
+                  mRow.appendChild(poolEl);
+                }
 
-                // Buy/sell actions (only if active and joined)
-                if (!s.archived && JOINED.has(me)) {
+                if (canBet) {
                   const actions = document.createElement("div");
                   actions.className = "marketActions";
 
@@ -2088,60 +2293,140 @@
                   actions.appendChild(buyInp);
                   actions.appendChild(buyBtn);
 
+                  const buyPreview = document.createElement("div");
+                  buyPreview.className = "betPreview";
+                  buyInp.addEventListener("input", () => {
+                    const c = parseInt(buyInp.value, 10);
+                    if (c > 0) {
+                      const fee = c * FEE_RATE;
+                      const net = c - fee;
+                      const pBefore = pool;
+                      const tBefore = totalPool;
+                      let simShares;
+                      if (pBefore <= 0 || tBefore <= 0) { simShares = net; }
+                      else { simShares = net * (tBefore / pBefore); }
+                      const newTotalSh = totalSh + simShares;
+                      const newTotalPool = tBefore + net;
+                      const payout = newTotalSh > 0 ? (simShares / newTotalSh) * newTotalPool : net;
+                      buyPreview.innerHTML = "";
+                      const payoutSpan = document.createElement("span");
+                      payoutSpan.className = "ok";
+                      const mult = c > 0 ? payout / c : 0;
+                      payoutSpan.textContent = `Payout if wins: ${formatCredits(payout)} (~${mult.toFixed(1)}x)`;
+                      buyPreview.appendChild(payoutSpan);
+                      buyPreview.appendChild(document.createTextNode(` \u00B7 Fee: ${formatCredits(fee)}`));
+                    } else {
+                      buyPreview.textContent = "";
+                    }
+                  });
+                  actions.appendChild(buyPreview);
+
                   if (myShares > 0) {
+                    const sellRow = document.createElement("div");
+                    sellRow.style.cssText = "display:flex;gap:4px;align-items:center;margin-top:4px;flex-wrap:wrap;";
                     const sellInp = document.createElement("input");
                     sellInp.type = "number";
                     sellInp.className = "inputInline";
-                    sellInp.placeholder = "shares";
+                    sellInp.placeholder = "credits";
                     sellInp.min = "1";
-                    sellInp.max = String(Math.floor(myShares));
+                    const maxGross = myShares * (pool / (totalSh || 1));
+                    const maxNet = maxGross * (1 - FEE_RATE);
+                    sellInp.max = String(Math.floor(maxNet));
                     const sellBtn = document.createElement("button");
                     sellBtn.className = "btn small";
-                    sellBtn.textContent = "Sell";
+                    sellBtn.textContent = "Cash out";
                     sellBtn.addEventListener("click", async () => {
-                      const sh = parseFloat(sellInp.value);
-                      if (!sh || sh <= 0) { window.alert("Enter shares to sell"); return; }
-                      try { await sellSharesFlow(s.id, opt.key, sh); setSending(false, true); }
+                      const desired = parseFloat(sellInp.value);
+                      if (!desired || desired <= 0) { window.alert("Enter credits to cash out"); return; }
+                      const gross = desired / (1 - FEE_RATE);
+                      const sharesToSell = totalSh > 0 ? gross * (totalSh / pool) : 0;
+                      if (sharesToSell <= 0) { window.alert("Cannot compute shares to sell"); return; }
+                      if (sharesToSell > myShares * 1.001) { window.alert(`Max you can cash out: ${formatCredits(maxNet)}`); return; }
+                      const actualShares = Math.min(sharesToSell, myShares);
+                      try { await sellSharesFlow(s.id, opt.key, actualShares); setSending(false, true); }
                       catch (e) { setSending(false, false); window.alert(e.message || e); }
                     });
-                    actions.appendChild(sellInp);
-                    actions.appendChild(sellBtn);
+                    const maxBtn = document.createElement("button");
+                    maxBtn.className = "maxBtn";
+                    maxBtn.textContent = "Max";
+                    maxBtn.type = "button";
+                    maxBtn.addEventListener("click", () => {
+                      sellInp.value = Math.round(maxNet * 100) / 100;
+                      sellInp.focus();
+                      sellInp.dispatchEvent(new Event("input"));
+                    });
+                    sellRow.appendChild(sellInp);
+                    sellRow.appendChild(sellBtn);
+                    sellRow.appendChild(maxBtn);
+
+                    const sellPreview = document.createElement("div");
+                    sellPreview.className = "betPreview";
+                    sellInp.addEventListener("input", () => {
+                      const desired = parseFloat(sellInp.value);
+                      if (desired > 0) {
+                        const gross = desired / (1 - FEE_RATE);
+                        const fee = gross * FEE_RATE;
+                        const sharesNeeded = totalSh > 0 ? gross * (totalSh / pool) : 0;
+                        const overMax = sharesNeeded > myShares * 1.001;
+                        if (overMax) {
+                          sellPreview.textContent = `Max: ${formatCredits(maxNet)}`;
+                        } else {
+                          sellPreview.textContent = `Fee: ${formatCredits(fee)} \u00B7 You receive: ${formatCredits(desired)}`;
+                        }
+                      } else {
+                        sellPreview.textContent = "";
+                      }
+                    });
+                    sellRow.appendChild(sellPreview);
+                    actions.appendChild(sellRow);
                   }
                   mRow.appendChild(actions);
                 }
                 marketContent.appendChild(mRow);
 
-                // Position row
                 if (myShares > 0) {
                   const pos = document.createElement("div");
                   pos.className = "positionRow";
-                  pos.innerHTML = "";
-                  const shEl = document.createElement("span");
-                  shEl.textContent = `Your shares: ${myShares.toFixed(1)}`;
+                  const ownershipPct = totalSh > 0 ? (myShares / totalSh) * 100 : 0;
+                  const ownEl = document.createElement("span");
+                  ownEl.style.fontWeight = "600";
+                  ownEl.style.color = "var(--fg)";
+                  ownEl.textContent = `You own ${ownershipPct.toFixed(1)}%`;
                   const valEl = document.createElement("span");
-                  valEl.textContent = `Value: ${formatCredits(Math.round(myValue))}`;
+                  valEl.textContent = `Cash-out value: ${formatCredits(myValue)}`;
                   const payEl = document.createElement("span");
-                  payEl.textContent = `If wins: ${formatCredits(Math.round(potentialPayout))}`;
-                  pos.appendChild(shEl);
+                  payEl.className = "ok";
+                  const posMult = myValue > 0 ? potentialPayout / myValue : 0;
+                  payEl.textContent = `Payout if wins: ${formatCredits(potentialPayout)} (~${posMult.toFixed(1)}x)`;
+                  pos.appendChild(ownEl);
                   pos.appendChild(valEl);
                   pos.appendChild(payEl);
                   marketContent.appendChild(pos);
                 }
 
-                // Prob bar
-                const pBar = document.createElement("div");
-                pBar.className = "probBar";
-                const pInner = document.createElement("div");
-                pInner.style.width = formatPct(prob);
-                pBar.appendChild(pInner);
-                marketContent.appendChild(pBar);
+                if (hasMarket) {
+                  const pBar = document.createElement("div");
+                  pBar.className = "probBar";
+                  const pInner = document.createElement("div");
+                  pInner.style.width = formatPct(prob);
+                  pBar.appendChild(pInner);
+                  marketContent.appendChild(pBar);
+                }
               }
 
-              const feeInfo = document.createElement("div");
-              feeInfo.className = "muted";
-              feeInfo.style.cssText = "font-size:11px;margin-top:8px;";
-              feeInfo.textContent = `Total pool: ${formatCredits(Math.round(totalPool))} \u00B7 Fee pool: ${formatCredits(Math.round(mkt.feePool))} (distributed to voters at settlement)`;
-              marketContent.appendChild(feeInfo);
+              if (hasMarket) {
+                const feeInfo = document.createElement("div");
+                feeInfo.className = "muted";
+                feeInfo.style.cssText = "font-size:11px;margin-top:8px;";
+                let feeText = `Total pool: ${formatCredits(totalPool)} \u00B7 Voter fees: ${formatCredits(mkt.feePool)}`;
+                if (mkt.creatorReward > 0) {
+                  const creatorName = mkt.creator ? (GLOBAL_USERNAMES.get(mkt.creator) || deriveDefaultUsername(mkt.creator)) : "creator";
+                  feeText += ` \u00B7 Creator earned: ${formatCredits(mkt.creatorReward)}`;
+                  if (mkt.creatorReward < CREATOR_REWARD_CAP) feeText += ` / ${CREATOR_REWARD_CAP}`;
+                }
+                feeInfo.textContent = feeText;
+                marketContent.appendChild(feeInfo);
+              }
             }
           }
 
@@ -2184,7 +2469,7 @@
                   name.textContent = GLOBAL_USERNAMES.get(pubkey) || deriveDefaultUsername(pubkey);
                   const amt = document.createElement("span");
                   amt.style.fontVariantNumeric = "tabular-nums";
-                  amt.textContent = formatCredits(Math.round(amount));
+                  amt.textContent = formatCredits(amount);
                   row.appendChild(name);
                   row.appendChild(amt);
                   settledContent.appendChild(row);
@@ -2196,7 +2481,7 @@
                 const divEl = document.createElement("div");
                 divEl.className = "muted";
                 divEl.style.cssText = "font-size:12px;margin-top:8px;";
-                divEl.textContent = `Voter dividend: ${formatCredits(Math.round(settlement.voterDividendPer))} per voter (${settlement.voterCount} voters)`;
+                divEl.textContent = `Voter dividend: ${formatCredits(settlement.voterDividendPer)} per voter (${settlement.voterCount} voters)`;
                 settledContent.appendChild(divEl);
               }
 
@@ -2210,7 +2495,7 @@
                   const plEl = document.createElement("div");
                   plEl.style.cssText = "margin-top:8px;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:13px;";
                   const total = myPayout + myDiv;
-                  plEl.textContent = `Your return: ${formatCredits(Math.round(total))} credits` + (myDiv > 0 ? ` (includes ${formatCredits(Math.round(myDiv))} voter dividend)` : "");
+                  plEl.textContent = `Your return: ${formatCredits(total)} credits` + (myDiv > 0 ? ` (includes ${formatCredits(myDiv)} voter dividend)` : "");
                   settledContent.appendChild(plEl);
                 }
               }
@@ -2287,7 +2572,7 @@
             if (entry.pubkey === me) name.style.fontWeight = "700";
             const earnings = document.createElement("div");
             earnings.className = "leaderStat";
-            earnings.textContent = formatCredits(Math.round(entry.totalEarnings));
+            earnings.textContent = formatCredits(entry.totalEarnings);
             const wr = document.createElement("div");
             wr.className = "leaderStat";
             wr.style.minWidth = "60px";
@@ -2368,10 +2653,25 @@
             } catch (e) { console.warn("Could not discover chain ID:", e); }
           }
 
+          const initialHash = location.hash || "";
+
           setSending(false);
           navigateToList();
 
           // --- Event listeners ---
+          function navigateFromHash(hash) {
+            const h = typeof hash === "string" ? hash : (location.hash || "");
+            if (h === "#leaderboard") { navigateToLeaderboard(); return; }
+            if (h === "#info") { navigateToInfo(); return; }
+            const m = h.match(/^#survey\/(.+)$/);
+            if (m) {
+              const id = decodeURIComponent(m[1]);
+              if (SURVEYS.some(s => s.id === id)) { navigateToSurvey(id); refreshLoopOnce(); return; }
+            }
+            navigateToList();
+          }
+          window.addEventListener("hashchange", () => navigateFromHash());
+
           $("backBtn").addEventListener("click", navigateToList);
 
           $("headerUsernameBtn").addEventListener("click", () => {
@@ -2399,6 +2699,15 @@
           });
 
           $("leaderboardBtn").addEventListener("click", navigateToLeaderboard);
+          $("infoBtn").addEventListener("click", navigateToInfo);
+
+          $("resolveEarlyBtn").addEventListener("click", async () => {
+            const s = currentSurvey();
+            if (!s || s.archived || sending) return;
+            if (!window.confirm("Resolve this question early? This will end voting and settle the market.")) return;
+            try { await resolveEarlyFlow(s.id); setSending(false, true); }
+            catch (e) { setSending(false, false); window.alert(e.message || e); }
+          });
 
           $("addOptionToggleBtn").addEventListener("click", () => {
             if (sending || !currentSurveyId) return;
@@ -2450,6 +2759,7 @@
           initSurveyOptionFields();
 
           await refreshLoopOnce();
+          if (initialHash) navigateFromHash(initialHash);
           setInterval(refreshLoopOnce, 4000);
 
           setInterval(() => {
