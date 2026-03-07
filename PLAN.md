@@ -1,6 +1,6 @@
 ---
 name: Feedback Hub Full Build
-overview: Implement the full Feedback Hub system across both repos (usernode-dapp-starter for the widget, usernode-feedback-hub for the Hub dapp/server/Gastown adapter), following the 4-phase roadmap in FEEDBACK_HUB_SPEC.md.
+overview: Implement the full Feedback Hub system across both repos (usernode-dapp-starter for the widget, usernode-feedback-hub for the Hub dapp/server/Gastown instances), following the 4-phase roadmap in FEEDBACK_HUB_SPEC.md.
 todos:
   - id: phase1a-widget
     content: "Phase 1A: Build usernode-feedback.js widget in dapp-starter (floating button, Shadow DOM, submit memo, progress bar, auto-detect target_app). Add serving routes. Embed in all example dapps."
@@ -24,7 +24,7 @@ todos:
     content: "Phase 2E: Expand Hub Server REST API (/api/issues, /api/issues/:id, /api/feedback/ungrouped, /api/stats, /api/apps)."
     status: pending
   - id: phase3a-infra
-    content: "Phase 3a: Install Gastown + Beads + agent CLIs. Set up GitHub App. Initialize rigs per target app. Configure agent presets. Build Gastown adapter (adapter.js, gastown-bridge.js, status-poller.js, webhook-handler.js, github-app.js). Wire Hub Server -> adapter task dispatch."
+    content: "Phase 3a: Build Gastown instance container (Dockerfile, start.js, adapter). Write generate-compose.js. Set up GitHub App. Create config.json with all apps. Build per-instance adapter (adapter.js, gastown-bridge.js, status-poller.js, webhook-handler.js, github-app.js). Wire Hub Server -> per-instance task dispatch."
     status: pending
   - id: phase3b-pr-pipeline
     content: "Phase 3b: PR creation flow (polecats use gh pr create, adapter detects + reports). GitHub webhook handler for @mayor commands (adapter relays via gt mail). Review feedback loop. Failure detection (stalled convoy -> needs-help, repeated -> manual)."
@@ -47,7 +47,7 @@ isProject: false
 
 ## Repo Boundary
 
-Per the spec, the **widget** (`usernode-feedback.js`) lives in `usernode-dapp-starter` alongside the bridge and usernames module. The **Hub dapp, Hub Server, and Gastown adapter** live in `usernode-feedback-hub`. They communicate only through on-chain transactions (widget writes, hub reads).
+Per the spec, the **widget** (`usernode-feedback.js`) lives in `usernode-dapp-starter` alongside the bridge and usernames module. The **Hub dapp, Hub Server, and Gastown instance containers** live in `usernode-feedback-hub`. They communicate only through on-chain transactions (widget writes, hub reads).
 
 ---
 
@@ -184,38 +184,38 @@ Expand `server/server.js` with the full API surface:
 
 ## Phase 3a: Gastown Infrastructure
 
-### Gastown Setup
+### Gastown Instance Container
 
-- Install Gastown (`gt`), Beads (`bd`), tmux, and agent CLIs (claude, opencode, etc.)
-- Initialize Gastown town: `gt init ~/gt`
-- Add a rig for each target app: `gt rig add him <repo-url>`, etc.
-- Configure agent presets: `gt config agent set glm5 "opencode -m openrouter/z-ai/glm-5"`, etc.
-- Create `CLAUDE.md` / repo context files in each target repo
-- Set up GitHub App (permissions: Contents, PRs, Issues R/W; Metadata, Checks R)
-
-### Gastown Adapter
-
-- Create `adapter/adapter.js` — Express API:
+- Create `gastown/Dockerfile` — single image used by all rig instances: Node.js + Go + gt + bd + tmux + gh + agent CLIs
+- Create `gastown/start.js` — entrypoint: first-boot setup (`gt install`, `gt rig add $RIG_NAME $REPO_URL`, agent preset config from env vars), then starts adapter HTTP server on port 3001
+- Create `gastown/adapter.js` — Express API:
   - `POST /api/tasks` — accept task spec from Hub Server, translate to `bd create` + `gt convoy create` + `gt sling`
   - `GET /api/tasks/:id` — task status (polls `gt convoy list --json`)
   - `POST /api/tasks/:id/cancel` — cancel running task
-- Create `adapter/gastown-bridge.js` — wraps `gt`/`bd` CLI calls with `--json`/`--stdin` via `child_process.execSync`
-- Create `adapter/status-poller.js` — `setInterval` (30s) polling convoy/bead status, POSTs updates to Hub Server
-- Create `adapter/webhook-handler.js` — receives GitHub webhooks, relays `@mayor` commands via `gt mail --stdin`
-- Create `adapter/github-app.js` — GitHub App auth via `@octokit/auth-app`, installation token generation
-- Create `adapter/commands.js` — `@mayor` command parser (revise, retry, explain, scope, abort)
-- Create `config.json` — Mayor Registry mapping target_app to rig/repo/path/models/limits
+- Create `gastown/gastown-bridge.js` — wraps `gt`/`bd` CLI calls with `--json`/`--stdin` via `child_process.execSync`
+- Create `gastown/status-poller.js` — `setInterval` (30s) polling convoy/bead status, POSTs updates to Hub Server at `$HUB_SERVER_URL`
+- Create `gastown/webhook-handler.js` — receives GitHub webhooks forwarded by Hub Server, relays `@mayor` commands via `gt mail --stdin`
+- Create `gastown/github-app.js` — GitHub App auth via `@octokit/auth-app`, installation token generation
+- Create `gastown/commands.js` — `@mayor` command parser (revise, retry, explain, scope, abort)
 
-### Docker + Deployment
+### Compose Generation
 
-- Update `docker-compose.yml`:
-  - **Hub Server** — existing
-  - **Gastown adapter** — new service, mounts `gastown-home` volume
-  - **Gastown** — container with `gt`, `bd`, `tmux`, `gh`, agent CLIs installed; shares `gastown-home` volume
+- Create `scripts/generate-compose.js` — reads `config.json`, emits `docker-compose.yml` with:
+  - `hub-server` service (static)
+  - One `gastown-<rig>` service per app entry, parameterized by env vars (`RIG_NAME`, `REPO_URL`, `REPO_PATH`, `MAYOR_MODEL`, `WORKER_AGENT`, `MAX_POLECATS`, `MAX_BUDGET_USD`, `HUB_SERVER_URL`)
+  - Named volumes: `hub-data` + one per rig
+  - Port mapping: 3101, 3102, ... for each instance (internal port always 3001)
+- Create `config.json` — top-level `settings` (voting thresholds, collation interval, polling intervals) + `apps` map (per-app identity, repo targeting, Gastown config)
+
+### GitHub App + Repo Context
+
+- Set up GitHub App (permissions: Contents, PRs, Issues R/W; Metadata, Checks R)
+- Create `CLAUDE.md` / repo context files in each target repo
 
 ### Hub Server Integration
 
-- Wire `server/server.js` to POST task specs to Gastown adapter when issues reach "ready" status
+- Wire `server/server.js` to POST task specs to per-rig Gastown instances (`http://gastown-<rig>:3001`) when issues reach "ready" status
+- Hub Server routes incoming GitHub webhooks to the appropriate instance based on repo in payload
 - Add `GET /api/issues/:id/spec` — AI-generated task spec endpoint
 
 ---
@@ -230,13 +230,14 @@ Expand `server/server.js` with the full API surface:
 ### PR Creation Flow
 
 - Polecats create PRs via `gh pr create` with `Fixes #N`, labels `ai-generated` + app name
-- Adapter detects convoy completion via status polling, reports PR URL to Hub Server
+- Instance adapter detects convoy completion via status polling, reports PR URL to Hub Server
 
 ### Review Feedback Loop
 
-- Webhook handler in `adapter/webhook-handler.js`:
+- Hub Server receives GitHub webhooks, routes to appropriate Gastown instance by repo
+- Instance webhook handler in `gastown/webhook-handler.js`:
   - `issue_comment` — detect `@mayor` commands, relay via `gt mail --stdin` to Mayor/polecat
-  - `pull_request` — detect merges, update Hub status to "merged"
+  - `pull_request` — detect merges, report to Hub Server
   - `pull_request_review` — detect "changes requested"
   - `issues` — detect manual close/reopen of mirrored issues
 - Mayor/polecat receives mail, processes instruction, pushes new commits
@@ -244,7 +245,7 @@ Expand `server/server.js` with the full API surface:
 ### Failure Handling
 
 - Gastown Deacon detects stuck agents; GUPP handles crash recovery via bead persistence
-- Adapter detects stalled convoys, creates PR with `needs-help` label + explanation
+- Instance adapter detects stalled convoys, creates PR with `needs-help` label + explanation
 - Track stalled convoy count per issue; after 3 failures, move to "manual" status
 - Hub dapp shows "needs-help" and "manual" states with explanation
 
@@ -296,20 +297,27 @@ flowchart TB
     VoteTx["vote txs"]
   end
 
-  subgraph feedbackHub ["usernode-feedback-hub"]
+  subgraph feedbackHub ["usernode-feedback-hub (hub-server container)"]
     HubDapp["hub/index.html"]
     HubServer["server/server.js"]
     Collator["server/collator.js"]
     Thresholds["server/thresholds.js"]
     DB["SQLite"]
-    Adapter["adapter/adapter.js"]
   end
 
-  subgraph gastown ["Gastown (per rig)"]
-    GtMayor["Mayor"]
-    Polecats["Polecats"]
-    Refinery["Refinery"]
-    Worktrees["Git Worktrees"]
+  subgraph gastownInstances ["Gastown Instances (1 container per rig)"]
+    subgraph himInst ["gastown-him"]
+      HimAdapter["adapter"]
+      HimGt["gt runtime"]
+    end
+    subgraph fsInst ["gastown-falling-sands"]
+      FsAdapter["adapter"]
+      FsGt["gt runtime"]
+    end
+    subgraph hubInst ["gastown-feedback-hub"]
+      HubAdapter["adapter"]
+      HubGt["gt runtime"]
+    end
   end
 
   subgraph external ["External Services"]
@@ -325,13 +333,17 @@ flowchart TB
   HubServer -->|chain poller| GroupTx
   HubServer -->|chain poller| VoteTx
   HubServer --> DB
-  HubServer -->|"POST /api/tasks"| Adapter
+  HubServer -->|"POST /tasks"| HimAdapter
+  HubServer -->|"POST /tasks"| FsAdapter
+  HubServer -->|"POST /tasks"| HubAdapter
+  HubServer -->|webhooks| HimAdapter
   Collator --> LLM
-  Adapter -->|"gt/bd CLI"| GtMayor
-  GtMayor --> Polecats
-  Polecats --> Worktrees
-  Polecats --> Refinery
-  Polecats -->|"gh pr create"| GitHub
+  HimAdapter -->|"gt/bd CLI"| HimGt
+  FsAdapter -->|"gt/bd CLI"| FsGt
+  HubAdapter -->|"gt/bd CLI"| HubGt
+  HimGt -->|"gh pr create"| GitHub
+  FsGt -->|"gh pr create"| GitHub
+  HubGt -->|"gh pr create"| GitHub
   Thresholds -->|"issue ready"| GitHub
 ```
 
@@ -343,7 +355,8 @@ flowchart TB
 - **Hub Server and Hub dapp are co-deployed** on the same origin (relative API paths like `/api/issues`)
 - **Chain poller is the source of truth bridge** — all on-chain data (feedback, groups, votes) flows through the poller into SQLite; the REST API reads from SQLite
 - **AI suggestions are off-chain** (stored in SQLite); user confirmations are on-chain (`group`/`ungroup` txs)
-- **Gastown for agent orchestration** — task decomposition (Mayor), merge queue (Refinery), worker monitoring (Witness + Deacon), crash recovery (GUPP + Beads) all built-in; thin Node.js adapter wraps CLI
+- **Gastown for agent orchestration** — task decomposition (Mayor), merge queue (Refinery), worker monitoring (Witness + Deacon), crash recovery (GUPP + Beads) all built-in; thin per-instance Node.js adapter wraps CLI
+- **One container per rig** — `docker-compose.yml` generated from `config.json` by `scripts/generate-compose.js`; each rig is independently restartable and resource-limitable; natural unit for future decentralization
 - **Split Mayor/worker models** — expensive model (Opus) for Mayor coordination, cheap models (GLM-5, Kimi) for polecats; ~$10-20 per convoy vs ~$100 all-Opus
 - **Git worktrees for isolation** — lighter than Docker containers, naturally integrates with Git-based PR workflows
 - **GitHub App for auth** — short-lived installation tokens, bot identity, webhook support
