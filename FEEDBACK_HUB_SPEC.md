@@ -1048,6 +1048,14 @@ The Feedback Hub uses this module for displaying usernames on feedback submissio
 - Mayor performance dashboard (`feedback-hub`)
 - Evaluate community governance (`feedback-hub`)
 
+## Future: Decentralized Gastown Rigs
+
+Today the Usernode team operates all Gastown instances centrally. This is necessary because centralized ops means running privileged code (GitHub App credentials, LLM API keys) — we can't run Dockerfiles authored by untrusted third parties with those credentials.
+
+The adapter API contract (`POST /api/tasks`, `GET /api/tasks/:id`, webhooks) is designed to be location-agnostic. The hub doesn't care whether it's talking to a centralized adapter or a per-dapp instance. When the time comes, dapp developers could self-host their own Gastown rigs with their own credentials, register their adapter endpoint with the hub, and receive tasks directly. The adapter code could be extracted to `dapp-starter` as shared infrastructure at that point.
+
+Not planned — just a direction the architecture supports.
+
 ## Future: Community-Governed Merges
 
 In the long run, the maintainer merge step can be replaced by community governance:
