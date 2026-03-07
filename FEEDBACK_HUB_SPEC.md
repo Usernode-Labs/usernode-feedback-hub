@@ -102,7 +102,7 @@ The Hub Server:
    - Body: summary, vote results ("31 yes / 4 no — 89% approval"), grouped feedback items with usernames, link to Hub detail page
    - Labels: `feedback-hub`, `him`, `bug`
    - → GitHub Issue **#42** is created
-3. POSTs a task spec to the Mayor Orchestrator:
+3. POSTs a task spec to the Gastown adapter:
    ```json
    {
      "issueId": "fb-042",
@@ -117,18 +117,20 @@ The Hub Server:
    ```
 4. Updates `fb-042` status to **"in-progress"**
 
-### Day 6 + minutes: Mayor dispatches the agent
+### Day 6 + minutes: Gastown Mayor dispatches agents
 
-The Mayor Orchestrator:
-1. Looks up the config for `"him"` in the Mayor Registry → repo `org/usernode-dapp-starter`, path `examples/him/`, model `anthropic/claude-sonnet-4-20250514`
-2. Enqueues the task into BullMQ queue `mayor:him`
-3. The worker picks up the task, generates a fresh GitHub App installation token
-4. Clones the repo, creates branch `feedback/fb-042-balance-update`
-5. Starts an ephemeral Docker sandbox container (`--memory=2g --cpus=1 --rm`)
-6. Runs OpenHands headless inside the container:
-   - Reads `.openhands/microagents/repo.md` for project conventions
+The Gastown adapter:
+1. Looks up the config for `"him"` in the Mayor Registry → rig `him`, repo `org/usernode-dapp-starter`, path `dapps/him/`
+2. Creates a bead from the task spec and a convoy for `fb-042`
+3. Slings the bead to the `him` rig
+
+The Gastown Mayor in the `him` rig:
+4. Picks up the convoy, determines this is a small bug fix (single bead, no decomposition needed)
+5. Slings the bead to a polecat
+6. The polecat works in an isolated Git worktree:
+   - Reads `CLAUDE.md` for project conventions
    - Reads GitHub Issue #42 via `gh issue view 42` for full context
-   - Examines `examples/him/him.html`, finds the sell handler doesn't call `refreshLoopOnce()` after the transaction completes
+   - Examines `dapps/him/him.html`, finds the sell handler doesn't call `refreshLoopOnce()` after the transaction completes
    - Adds the missing `await refreshLoopOnce();` call
    - Runs linting (eslint, prettier) — passes
    - Commits: `fix: refresh balance display after share sale`
@@ -137,8 +139,7 @@ The Mayor Orchestrator:
    - Title: `[AI Mayor] Fix: Balance doesn't update after selling shares`
    - Body: `Fixes #42` + summary + link to Hub issue
    - Labels: `ai-generated`, `him`
-9. Reports PR URL to Hub Server → status updated to **"pr-open"**
-10. Docker container destroyed
+9. Adapter detects convoy completion, reports PR URL to Hub Server → status updated to **"pr-open"**
 
 ### Day 6 + hours: Maintainer reviews
 
@@ -146,15 +147,15 @@ A maintainer sees the PR on GitHub. The code change looks right but they want a 
 
 > `@mayor revise: also call refreshLoopOnce() after the buy handler for consistency`
 
-GitHub fires an `issue_comment` webhook → Mayor Orchestrator enqueues a revision task → agent checks out the existing branch, makes the additional change, pushes → PR auto-updates.
+GitHub fires an `issue_comment` webhook → Gastown adapter relays via `gt mail --stdin` → the polecat receives the instruction, makes the additional change, pushes → PR auto-updates.
 
-The mayor comments on the PR: "Pushed revision addressing your feedback."
+The agent comments on the PR: "Pushed revision addressing your feedback."
 
 ### Day 7: Merge
 
 The maintainer approves and merges the PR. GitHub auto-closes Issue #42 (because the PR body contained `Fixes #42`).
 
-The `pull_request` webhook fires → Mayor Orchestrator reports to Hub Server → `fb-042` status updated to **"merged"**.
+The `pull_request` webhook fires → Gastown adapter reports to Hub Server → `fb-042` status updated to **"merged"**.
 
 Alice opens the Hub and sees her feedback item now shows: "Status: Merged — [PR #43](https://github.com/org/usernode-dapp-starter/pull/43)". The fix ships in the next deploy.
 
@@ -168,11 +169,11 @@ Alice opens the Hub and sees her feedback item now shows: "Status: Merged — [P
 | Voting | Hub dapp UI → Bridge → Chain → Hub Server threshold checker |
 | Auto-promotion | Hub Server scheduler → SQLite |
 | GitHub Issue creation | Hub Server → GitHub App → GitHub API |
-| Task dispatch | Hub Server → Mayor Orchestrator REST API → BullMQ → Redis |
-| Agent execution | Worker → Docker sandbox → OpenHands → git → GitHub |
-| PR creation | Worker → Octokit → GitHub API |
-| Review loop | GitHub webhook → Mayor Orchestrator → BullMQ → Worker → OpenHands |
-| Merge detection | GitHub webhook → Mayor Orchestrator → Hub Server |
+| Task dispatch | Hub Server → Gastown adapter → Beads → Convoy → Rig |
+| Agent execution | Gastown Mayor → Polecat → Git worktree → git → GitHub |
+| PR creation | Polecat → `gh pr create` → GitHub API |
+| Review loop | GitHub webhook → Gastown adapter → `gt mail` → Mayor/Polecat |
+| Merge detection | GitHub webhook → Gastown adapter → Hub Server |
 
 ### Design notes surfaced by this walkthrough
 
@@ -194,7 +195,7 @@ Alice opens the Hub and sees her feedback item now shows: "Status: Merged — [P
 
 A feedback-to-pull-request pipeline that turns user feedback from any Usernode dapp into shipped code changes, with AI collation, community voting, and automated PR generation.
 
-Users leave feedback from any dapp via an embedded widget. An AI service suggests groupings of similar feedback into issues. Users control whether their feedback is grouped with others. The community votes on which issues to tackle. Issues that pass voting thresholds are dispatched to per-repo AI "mayors" — autonomous orchestrators that spawn coding agents to implement changes and create pull requests. Repo maintainers review, interact with the mayor in the PR, and merge.
+Users leave feedback from any dapp via an embedded widget. An AI service suggests groupings of similar feedback into issues. Users control whether their feedback is grouped with others. The community votes on which issues to tackle. Issues that pass voting thresholds are dispatched to per-repo Gastown "mayors" — AI coordinators that decompose tasks, dispatch coding agents (polecats), and create pull requests. Repo maintainers review, interact with the mayor in the PR, and merge.
 
 The long-term vision is fully community-governed: no maintainer bottleneck. The initial version keeps maintainers in the loop for PR review while automating everything upstream.
 
@@ -205,7 +206,7 @@ The long-term vision is fully community-governed: no maintainer bottleneck. The 
 3. Your feedback is submitted as an on-chain transaction — transparent, permanent, attributed to your address.
 4. The Feedback Hub (a separate dapp) shows your feedback. The AI has suggested grouping your "the sell button doesn't update the balance" with three other people's reports about the same bug. You can accept the suggested grouping, or ungroup your feedback if the AI got it wrong.
 5. You vote yes/no on issues you care about. You can filter by app.
-6. Issues that get enough votes are automatically picked up by the repo's AI mayor, which spawns a coding agent, writes a fix, and opens a PR on GitHub.
+6. Issues that get enough votes are automatically picked up by the repo's AI mayor, which decomposes the work if needed, dispatches coding agents, writes a fix, and opens a PR on GitHub.
 7. Maintainers review, discuss with the mayor in the PR using `@mayor` commands, request changes, and merge.
 
 ## Architecture Overview
@@ -236,17 +237,21 @@ A Node.js server that:
 - Polls the chain for new feedback transactions (submissions, grouping actions, votes)
 - Runs AI collation (suggesting groupings, deduplication, priority scoring)
 - Tracks votes and computes thresholds
-- Dispatches promoted issues to the Mayor Orchestrator for PR generation
-- Receives status callbacks from the Mayor Orchestrator to update pipeline state
+- Dispatches promoted issues to the Gastown adapter for multi-agent PR generation
+- Receives status callbacks from the Gastown adapter to update pipeline state
 
-### 4. Mayor Orchestrator (agent service)
+### 4. Mayor Orchestrator (Gastown + adapter)
 
-A separate Node.js service that manages per-repo AI coding agents. Each repo gets an independent "mayor" — a persistent orchestration context with its own task queue, model configuration, and concurrency limits. When the Hub Server dispatches a task, the mayor:
-- Enqueues it into the target repo's BullMQ queue
-- Spawns a coding agent inside a Docker sandbox container
-- Monitors execution, pushes branches, and creates GitHub PRs
-- Handles the maintainer feedback loop via GitHub webhooks (`@mayor` commands)
-- Reports status back to the Hub Server
+Each repo gets a **Gastown rig** — an independent multi-agent workspace with its own Mayor (AI coordinator), polecats (worker agents), Refinery (merge queue), Witness (health monitor), and Deacon (patrol loop). A thin Node.js adapter service sits between the Hub Server and Gastown, translating task specs into Gastown CLI commands and polling for status updates.
+
+When the Hub Server dispatches a task:
+- The adapter creates beads (`bd create`) from the task spec
+- Groups them into a convoy (`gt convoy create`) with dependency ordering
+- The Gastown Mayor decomposes large tasks further if needed, then slings beads to polecats
+- Polecats work in isolated Git worktrees, making changes and committing
+- The Refinery manages the merge queue, resolving conflicts between parallel workers
+- The adapter polls convoy status (`gt convoy list --json`) and reports back to the Hub Server
+- PRs are created by polecats or the Refinery via `gh` CLI
 
 See "Mayor Architecture" for full details.
 
@@ -280,54 +285,50 @@ Notes:
 | Pipeline status (voting → ready → in-progress → PR-open → merged) | Workflow state tied to GitHub |
 | PR URLs, merge status, agent conversation history | Lives in GitHub |
 | GitHub Issue mirror (number, URL, repo) | Created in target repo when issue reaches "ready"; synced back to Hub |
-| Mayor registry (per-repo agent configuration) | Operational config for the Mayor Orchestrator |
+| Mayor registry (per-rig Gastown configuration) | Operational config for the Gastown adapter: rig mapping, model selection, cost limits |
 
 The server exposes issue data via a REST API that the Hub dapp consumes. On-chain transactions (feedback submissions, grouping actions, votes) are the source of truth; the server is a read-derived index with AI enrichment.
 
 ## Mayor Registry
 
-The Mayor Orchestrator maintains a registry mapping each `target_app` to its repo, agent configuration, and resource limits. This is the single source of truth for both repo routing and agent behavior.
+The Gastown adapter maintains a registry mapping each `target_app` to its Gastown rig, agent configuration, and resource limits. This is the single source of truth for both repo routing and agent behavior.
 
 ```json
 {
   "him": {
     "repo": "org/usernode-dapp-starter",
-    "path": "examples/him/",
-    "model": "anthropic/claude-sonnet-4-20250514",
-    "maxConcurrent": 2,
-    "maxTurns": 30,
-    "maxBudgetUsd": 5.00
+    "path": "dapps/him/",
+    "rig": "him",
+    "mayorModel": "claude-opus-4-6",
+    "workerAgent": "glm5",
+    "maxPolecats": 3,
+    "maxBudgetUsd": 10.00
   },
   "lastwin": {
     "repo": "org/usernode-dapp-starter",
-    "path": "examples/last-one-wins/",
-    "model": "anthropic/claude-sonnet-4-20250514",
-    "maxConcurrent": 2,
-    "maxTurns": 30,
-    "maxBudgetUsd": 5.00
+    "path": "dapps/last-one-wins/",
+    "rig": "lastwin",
+    "mayorModel": "claude-opus-4-6",
+    "workerAgent": "glm5",
+    "maxPolecats": 3,
+    "maxBudgetUsd": 10.00
   },
   "falling-sands": {
     "repo": "org/falling-sands",
     "path": "/",
-    "model": "openai/gpt-4o",
-    "maxConcurrent": 1,
-    "maxTurns": 20,
-    "maxBudgetUsd": 3.00
-  },
-  "starter": {
-    "repo": "org/usernode-dapp-starter",
-    "path": "/",
-    "model": "anthropic/claude-sonnet-4-20250514",
-    "maxConcurrent": 1,
-    "maxTurns": 30,
+    "rig": "falling-sands",
+    "mayorModel": "claude-sonnet-4-20250514",
+    "workerAgent": "kimi",
+    "maxPolecats": 2,
     "maxBudgetUsd": 5.00
   },
   "feedback-hub": {
     "repo": "org/usernode-feedback-hub",
     "path": "/",
-    "model": "anthropic/claude-sonnet-4-20250514",
-    "maxConcurrent": 1,
-    "maxTurns": 30,
+    "rig": "feedback-hub",
+    "mayorModel": "claude-sonnet-4-20250514",
+    "workerAgent": "glm5",
+    "maxPolecats": 2,
     "maxBudgetUsd": 5.00
   }
 }
@@ -335,10 +336,11 @@ The Mayor Orchestrator maintains a registry mapping each `target_app` to its rep
 
 - `repo`: GitHub `owner/repo` string
 - `path`: Scopes the agent's changes to a subdirectory (useful for monorepos)
-- `model`: LLM model identifier, routed via LiteLLM proxy (swap providers without code changes)
-- `maxConcurrent`: Maximum simultaneous tasks for this app's mayor (enforced by BullMQ)
-- `maxTurns`: Maximum agent reasoning turns per task
-- `maxBudgetUsd`: Cost ceiling per task (agent aborts if exceeded)
+- `rig`: Name of the Gastown rig (maps to `~/gt/<rig>/`)
+- `mayorModel`: LLM used for the Mayor (task decomposition, coordination). Use a strong model.
+- `workerAgent`: Gastown agent preset for polecats. Configured via `gt config agent set <name> "<command>"`. Use cheaper models for cost efficiency.
+- `maxPolecats`: Maximum concurrent worker agents for this rig
+- `maxBudgetUsd`: Cost ceiling per convoy (adapter tracks via Gastown's token metrics)
 
 This mapping is stored in `config.json` and exposed via `/api/apps`.
 
@@ -513,10 +515,10 @@ Per feedback item:   submit → suggested → grouped ─┐
 | **grouped** | Feedback | User has accepted grouping (sent `group` tx) | User via Hub dapp |
 | **voting** | Issue | Has at least one confirmed feedback item; open for community votes | Automatic once first `group` tx lands |
 | **ready** | Issue | Passed voting thresholds; GitHub Issue created in target repo; queued for the repo's mayor | Auto-promotion rules (see above) |
-| **in-progress** | Issue | Mayor has dispatched a coding agent in a Docker sandbox | Mayor Orchestrator (automatic) |
-| **pr-open** | Issue | PR created on GitHub, awaiting review | Mayor worker agent |
-| **needs-help** | Issue | Agent failed; PR opened with `needs-help` label for maintainer guidance | Mayor worker agent |
-| **manual** | Issue | 3 failed agent attempts; flagged for human implementation | Mayor Orchestrator (automatic) |
+| **in-progress** | Issue | Gastown Mayor has dispatched polecats in isolated Git worktrees | Gastown adapter (automatic) |
+| **pr-open** | Issue | PR created on GitHub, awaiting review | Gastown polecat / Refinery |
+| **needs-help** | Issue | Agent failed; PR opened with `needs-help` label for maintainer guidance | Gastown adapter (automatic) |
+| **manual** | Issue | 3 failed agent attempts; flagged for human implementation | Gastown adapter (automatic) |
 | **merged** | Issue | PR merged by maintainer | Maintainer on GitHub |
 | **archived** | Issue | Insufficient interest, all feedback ungrouped, or resolved by other means | Auto-archive rule or maintainer action |
 
@@ -552,7 +554,7 @@ The Hub Server is the source of truth for issue state. GitHub Issues are a mirro
 
 ### Agent Access
 
-The coding agent (OpenHands) receives the GitHub Issue number in its task spec. Inside the sandbox, it can read the issue natively via `gh issue view #N` to get full context. The PR it creates references `Fixes #N` so GitHub handles auto-close on merge.
+The coding agent (Gastown polecat) receives the GitHub Issue number in its bead context. Inside the Git worktree, it can read the issue natively via `gh issue view #N` to get full context. The PR it creates references `Fixes #N` so GitHub handles auto-close on merge.
 
 ### Why Mirror (Not Replace)
 
@@ -564,96 +566,84 @@ GitHub Issues are a convenience layer, not the source of truth:
 
 ---
 
-## Mayor Architecture
+## Mayor Architecture (Gastown)
 
-When an issue reaches "ready" status, the Hub Server dispatches it to the Mayor Orchestrator. Each repo in the ecosystem gets an independent mayor — a persistent orchestration context with its own task queue, model configuration, and concurrency limits.
+When an issue reaches "ready" status, the Hub Server dispatches it to the Gastown adapter. Each repo in the ecosystem gets an independent Gastown rig — a multi-agent workspace with its own Mayor (AI coordinator), polecats (worker agents), Refinery (merge queue), Witness (health monitor), and Deacon (patrol loop).
 
-The naming borrows from Steve Yegge's Gastown project (an open-source multi-agent workspace manager). Gastown's conceptual model — mayors that coordinate worker agents per repo — maps well to our needs. We adopt the metaphor but not the dependency: Gastown is CLI-only with no REST API, locked to Claude for the mayor brain, and only 2 months old with high churn. The implementation below uses OpenHands (model-agnostic, Docker-sandboxed, MIT license, 65K stars) as the worker agent runtime, orchestrated by a deterministic Node.js service.
+### Why Gastown
+
+Gastown provides task decomposition, merge queue management, worker monitoring, crash recovery, and multi-agent coordination out of the box. Building these capabilities from scratch with BullMQ + OpenHands would require months of engineering for functionality that Gastown already ships. The integration surface is a thin Node.js adapter (~500 lines) that translates HTTP to CLI calls. Gastown is model-agnostic via agent presets — workers (polecats) can use cheap models (GLM-5, Kimi K2.5) while the Mayor uses a stronger model. Git worktrees provide per-agent isolation. Beads (Git-backed work units) persist state across context window resets and agent crashes.
 
 ### Why This Architecture
 
-**The orchestrator is deterministic, not AI.** The Mayor Orchestrator routes tasks, manages queues, and handles webhooks — all deterministic operations. The AI reasoning happens inside sandboxed worker agents (OpenHands), which already know how to read repo context, plan changes, write code, and run tests. Making the orchestrator an AI would add latency, cost, and unpredictability for no benefit.
+**Why Gastown over a custom orchestrator?** Gastown provides task decomposition (Mayor), merge queue management (Refinery), worker monitoring (Witness + Deacon), crash recovery (GUPP + Beads persistence), and multi-agent parallel execution in isolated Git worktrees — all out of the box. Building this from scratch with BullMQ + OpenHands would require months of engineering for capabilities that Gastown already ships. The integration surface is a thin Node.js adapter (~500 lines) that translates HTTP ↔ CLI calls.
 
-**OpenHands over Claude Code SDK.** Claude Code's TypeScript SDK provides cleaner Node.js integration, but it's locked to Anthropic models. OpenHands uses LiteLLM as an abstraction layer, supporting 100+ LLM providers (Anthropic, OpenAI, Google, Mistral, Ollama, local models). Swapping models per repo is a config change, not a code change. If Claude turns out to be best for everything, you just point all configs at Claude.
+**Why Gastown's Beads over BullMQ?** Beads is Git-backed (versioned, mergeable, crash-recoverable) and designed specifically for agent work tracking. It persists agent identity and work state across context window resets — the core problem with long-running AI agents. BullMQ is a great general-purpose queue but doesn't solve the agent-specific problems of context loss, work resumption, and multi-agent coordination.
 
-**BullMQ over a simple in-process queue.** Per-repo concurrency limits, automatic retries with exponential backoff, delayed jobs, job deduplication (same issue shouldn't spawn two tasks), and persistence across server restarts. Redis is a single extra container.
+**Why Git worktrees over Docker containers?** Gastown isolates agents using Git worktrees — each polecat gets its own working directory branched from the same repo. This is lighter than Docker containers (no image builds, no socket mounting, instant startup) and naturally integrates with Git-based PR workflows. The tradeoff is weaker process isolation, which is acceptable for trusted agent code running in a controlled environment.
 
 **GitHub App over PAT.** Short-lived installation tokens (1–8 hours vs indefinite), 15,000 req/hr rate limits (vs 5,000 for PATs), fine-grained per-repo permissions, and the bot shows up as "AI Mayor[bot]" in the PR author/commenter fields — clearer provenance for the community.
 
-**Docker sibling containers over Docker-in-Docker.** The orchestrator mounts the host's Docker socket and creates peer containers. Simpler, more secure, better performance than nested Docker daemons. Each task gets an ephemeral container destroyed on completion.
+**Why a thin adapter instead of using Gastown directly?** Gastown is CLI-first with no built-in REST API. The Feedback Hub needs an HTTP interface for task dispatch and status polling. The adapter is a ~500-line Node.js service that wraps `gt` and `bd` CLI calls with `--json` and `--stdin` flags. It's thin enough to maintain but necessary for the Hub integration. If Gastown ships a native API in the future, the adapter can be replaced.
+
+**Why split Mayor model / worker model?** The Mayor (task decomposition, coordination) benefits from a strong reasoning model (Opus, Sonnet). Polecats (code execution) work well with cheaper models (GLM-5 at 1/6th cost, Kimi K2.5 at 1/10th cost). This split reduces per-convoy costs from ~$100 (all-Opus) to ~$10-20 for typical tasks while maintaining decomposition quality.
 
 ### Tech Stack
 
 | Layer | Technology | Why |
 |---|---|---|
-| Task queue | **BullMQ** + Redis | Per-repo queues, retries, concurrency control, delay/scheduling |
-| Worker agent | **OpenHands** (headless CLI) | Model-agnostic via LiteLLM, Docker-sandboxed, built-in PR creation, MIT license |
-| GitHub auth | **GitHub App** (`@octokit/auth-app`) | Short-lived tokens, 15K req/hr, per-repo permissions, bot identity |
-| GitHub API | **Octokit** (`@octokit/rest`, `@octokit/webhooks`) | PR creation, comment handling, webhook verification |
-| Sandboxing | **Docker sibling containers** | Host Docker socket mounted, ephemeral container per task |
-| LLM routing | **LiteLLM proxy** | Model-agnostic routing, per-repo model selection |
-| Repo context | **.openhands/microagents/repo.md** per repo | Auto-loaded by OpenHands at session start |
-| Status DB | **SQLite** (shared with Hub Server) | Task status, PR tracking, retry counts |
+| Agent orchestration | **Gastown** (`gt` CLI) | Task decomposition, merge queue, worker monitoring, crash recovery, multi-agent coordination — all built-in |
+| Adapter service | **Node.js** + Express | Thin translation layer: HTTP ↔ `gt` CLI. Webhook handler. Status polling. |
+| Worker agents | **Gastown polecats** (model-agnostic) | Configurable per-rig: Claude Code, Codex, Goose, OpenCode + any model via OpenRouter/LiteLLM |
+| Task tracking | **Beads** (Git + SQLite) | Gastown's built-in persistent work state. Survives context window resets and agent crashes. |
+| Isolation | **Git worktrees** | Gastown creates per-agent worktrees within each rig. No Docker containers needed for isolation. |
+| GitHub auth | **GitHub App** (`@octokit/auth-app`) | Short-lived tokens, 15K req/hr, bot identity. Tokens passed to `gh` CLI inside Gastown. |
+| GitHub API | **`gh` CLI** (inside Gastown) + **Octokit** (in adapter) | Polecats use `gh pr create`. Adapter uses Octokit for webhook verification and status updates. |
+| Repo context | **CLAUDE.md** / agent-specific context files per repo | Auto-loaded by Claude Code and other agents at session start |
+| Status DB | **SQLite** (Hub Server) | Pipeline status, PR tracking. Gastown's Beads handles agent-side state separately. |
 
 ### System Diagram
 
 ```
-Hub Server                          Mayor Orchestrator
-(existing)                          (new service)
-                                    
-issue reaches ──POST /api/tasks──►  Express API
-"ready"                                  │
-                                         ▼
-◄──GET /api/status/:taskId──────── Mayor Registry
-                                   (Map<app, config>)
-                                         │
-                                         ▼
-                                   BullMQ (Redis)
-                                   ┌─────────────────┐
-                                   │ mayor:him        │
-                                   │ mayor:lastwin    │
-                                   │ mayor:f-sands    │
-                                   │ mayor:fb-hub     │
-                                   └────────┬────────┘
-                                            │
-                                            ▼
-                                   Worker Process(es)
-                                   │
-                                   ├─ Clone repo
-                                   ├─ Create branch
-                                   ├─ Spawn Docker sandbox
-                                   ├─ Run OpenHands headless
-                                   ├─ Push branch
-                                   ├─ Create/update PR
-                                   └─ Report status to Hub
-                                            │
-                                            ▼
-                                   Docker Sandbox (ephemeral)
-                                   ┌───────────────────────┐
-                                   │ node:20-bookworm      │
-                                   │ + git + gh CLI        │
-                                   │ /workspace ← repo     │
-                                   │ OpenHands CodeAct     │
-                                   │ reads microagents/    │
-                                   │ makes changes         │
-                                   │ runs lint/test        │
-                                   │ commits + pushes      │
-                                   └───────────────────────┘
+Hub Server                     Gastown Adapter              Gastown (per rig)
+(existing)                     (Node.js service)            (gt CLI + tmux)
 
+issue reaches ──POST /tasks──► Adapter receives             
+"ready"                        task spec                    
+                                    │                       
+                               bd create (beads)            
+                               gt convoy create ──────────► Mayor decomposes
+                               gt sling ──────────────────► Polecats execute
+                                    │                            │
+                               polls gt convoy list --json       │
+                                    │                       Refinery merges
+                                    │                       gh pr create
+◄──GET /status/:taskId─────── reports status                     │
+                               back to Hub                       │
+                                                                 ▼
+                                                            GitHub PR
 
-GitHub ──webhooks──► Mayor Orchestrator
-  │                       │
-  │  issue_comment        ├─ @mayor revise → re-run agent
-  │  pull_request_review  ├─ @mayor retry  → fresh branch
-  │  check_suite          ├─ CI failure    → auto-retry
-  │  pull_request         └─ PR merged     → report to Hub
+GitHub ──webhooks──► Adapter ──gt mail --stdin──► Mayor/Polecat
+  issue_comment                                   (revises, retries)
+  pull_request_review
+  pull_request (merged)
 ```
+
+### Gastown Adapter
+
+The adapter is a thin Node.js + Express service with three responsibilities:
+
+**1. Task dispatch.** Receives POSTs from the Hub Server, translates into `bd create` + `gt convoy create` + `gt sling` CLI calls via `child_process.execSync`. Beads are created from the task spec's title, summary, feedback items, category, and target path. For large tasks (priority 4-5 or feature category), the adapter creates a single high-level bead and lets the Mayor decompose it into sub-beads. For small tasks (priority 1-2, bug category), the adapter creates a single bead and slings it directly to a polecat.
+
+**2. Status polling.** A `setInterval` loop (every 30 seconds) runs `gt convoy list --json` and `bd list --json` for each active rig, parses results, and POSTs status updates to the Hub Server. Detects state transitions: convoy complete → report PR URL, convoy stalled → report needs-help, all beads closed → report merged.
+
+**3. Webhook relay.** Receives GitHub webhooks (same events as before: `issue_comment`, `pull_request_review`, `check_suite`, `pull_request`). For `@mayor` commands, translates into `gt mail --stdin` to the relevant rig's Mayor or polecat session. For PR merges, updates the Hub Server status.
 
 ### Task Lifecycle: Happy Path
 
 1. Issue reaches "ready" in the Hub.
 2. Hub Server creates a GitHub Issue in the target repo (see "GitHub Issue Mirroring") and stores the issue number.
-3. Hub Server POSTs a task spec to the Mayor Orchestrator:
+3. Hub Server POSTs a task spec to the Gastown adapter:
    ```json
    {
      "issueId": "fb-042",
@@ -666,34 +656,35 @@ GitHub ──webhooks──► Mayor Orchestrator
      "githubIssue": { "repo": "org/usernode-dapp-starter", "number": 42 }
    }
    ```
-4. Orchestrator looks up the mayor config for `"him"`, enqueues the task into BullMQ queue `mayor:him`, returns a `taskId`.
-5. Hub updates the issue to "in-progress".
-6. Worker pulls the task, generates a fresh GitHub App installation token for `org/usernode-dapp-starter`.
-7. Worker clones the repo into `/tmp/workspaces/{taskId}/`, creates branch `feedback/fb-042-sell-balance-update`.
-8. Worker starts a Docker sandbox container with the repo bind-mounted at `/workspace`.
-9. OpenHands headless runs inside the container: reads `.openhands/microagents/repo.md` for context, reads GitHub Issue #42 via `gh issue view` for full details, implements the fix scoped to `examples/him/`, runs linting (eslint, prettier), and commits.
-10. Worker pushes the branch to GitHub, creates a draft PR via Octokit with title `[AI Mayor] Fix: Sell button doesn't update balance`, body containing `Fixes #42`, the issue summary, feedback items, labels `ai-generated` and `him`, and a link to the Hub issue detail page.
-11. Worker reports the PR URL to the Hub Server. Hub updates the issue to "pr-open".
-12. Docker container is destroyed.
+4. Adapter creates bead(s): `bd create --title "Fix: Sell button doesn't update balance" --body "<summary + feedback items>" --label bug --label him`
+5. Adapter creates convoy: `gt convoy create "fb-042" <bead-ids> --notify`
+6. Adapter slings to rig: `gt sling <bead-id> him`
+7. Hub updates the issue to "in-progress".
+8. Gastown Mayor picks up the convoy, optionally decomposes into sub-beads if the task is complex.
+9. Mayor slings sub-beads to polecats.
+10. Polecats work in isolated Git worktrees within the `him` rig, scoped to `dapps/him/`. Each polecat reads `CLAUDE.md` for repo conventions, reads GitHub Issue #42 via `gh issue view` for full context, implements changes, runs linting, and commits.
+11. Refinery manages the merge queue, resolving conflicts between parallel workers.
+12. Polecats or Refinery create PR via `gh pr create` with title `[AI Mayor] Fix: Sell button doesn't update balance`, body containing `Fixes #42`, the issue summary, feedback items, labels `ai-generated` and `him`, and a link to the Hub issue detail page.
+13. Adapter detects convoy completion via polling, reports PR URL to Hub Server. Hub updates the issue to "pr-open".
 
 ### Task Lifecycle: Review Feedback Loop
 
 1. Maintainer reviews the PR and leaves a comment: `@mayor revise: use the existing refreshBalance() helper instead`
-2. GitHub fires an `issue_comment` webhook to the Mayor Orchestrator.
-3. Webhook handler verifies the signature, confirms the comment contains `@mayor`, looks up which app/repo the PR belongs to, and extracts the instruction.
-4. A follow-up task is enqueued into the same mayor's queue with type `"revision"`, the existing PR number and branch, and the maintainer's instruction plus the original task context.
-5. Worker pulls the task, clones the repo, checks out the existing branch.
-6. OpenHands runs with the revision instruction and original context.
-7. New commits are pushed to the same branch. The PR auto-updates.
-8. Worker comments on the PR: "Pushed revision addressing your feedback."
+2. GitHub fires an `issue_comment` webhook to the Gastown adapter.
+3. Webhook handler verifies the signature, confirms the comment contains `@mayor`, looks up which rig the PR belongs to, and extracts the instruction.
+4. Adapter relays the instruction via `gt mail --stdin` to the relevant rig's Mayor or polecat session.
+5. The Mayor or relevant polecat receives the mail, processes the instruction, and makes changes in its worktree.
+6. New commits are pushed to the same branch. The PR auto-updates.
+7. The agent comments on the PR: "Pushed revision addressing your feedback."
 
 ### Task Lifecycle: Failure Path
 
-1. OpenHands fails (lint errors it can't fix, scope too large, timeout, budget exceeded).
-2. Worker creates a PR anyway with a `needs-help` label, including in the body what was attempted, where it got stuck, and relevant error logs.
-3. Worker reports "needs-help" status to the Hub. Hub keeps the issue at "needs-help" and flags it in the UI.
-4. Maintainer can comment `@mayor retry` (fresh attempt) or `@mayor scope: just fix X` (narrowed scope).
-5. After 3 failed attempts on the same issue, the issue moves to "manual" status — visible in the Hub as needing human implementation. Can be re-queued if new feedback arrives with better information.
+1. A polecat fails (lint errors it can't fix, scope too large, timeout, budget exceeded).
+2. Gastown's Deacon detects stuck agents via patrol loops. The Witness monitors health. If a polecat crashes, GUPP ensures the next session picks up where it left off (work is persisted in beads).
+3. If recovery doesn't succeed, the adapter detects a stalled convoy via status polling and creates a PR with a `needs-help` label, including in the body what was attempted, where it got stuck, and relevant error logs.
+4. Adapter reports "needs-help" status to the Hub. Hub keeps the issue at "needs-help" and flags it in the UI.
+5. Maintainer can comment `@mayor retry` (fresh attempt) or `@mayor scope: just fix X` (narrowed scope).
+6. After 3 stalled convoys on the same issue, the adapter reports "manual" status — visible in the Hub as needing human implementation. Can be re-queued if new feedback arrives with better information.
 
 ### Mayor Commands (GitHub PR Comments)
 
@@ -705,52 +696,31 @@ GitHub ──webhooks──► Mayor Orchestrator
 | `@mayor scope: <narrower instruction>` | Re-run with narrowed scope, force-push |
 | `@mayor abort` | Close the PR, move issue back to "ready" for future re-attempt |
 
-### Docker Sandbox
+### Gastown Setup Per Rig
 
-Base image for JS/Node dapp work:
+Each target repo is configured as a Gastown rig:
 
-```dockerfile
-FROM node:20-bookworm
+```bash
+# Initialize the town (one-time)
+gt init ~/gt
 
-RUN apt-get update && apt-get install -y \
-    git curl jq openssh-client ca-certificates gnupg \
-  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-     | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-     > /etc/apt/sources.list.d/github-cli.list \
-  && apt-get update && apt-get install gh -y \
-  && npm install -g typescript eslint prettier
+# Add a rig for each target app
+gt rig add him https://github.com/org/usernode-dapp-starter.git
+gt rig add falling-sands https://github.com/org/falling-sands.git
+gt rig add feedback-hub https://github.com/org/usernode-feedback-hub.git
 
-RUN git config --global user.name "AI Mayor[bot]" \
- && git config --global user.email "ai-mayor[bot]@users.noreply.github.com"
+# Configure agent presets (cheap workers)
+gt config agent set glm5 "opencode -m openrouter/z-ai/glm-5"
+gt config agent set kimi "opencode -m openrouter/moonshotai/kimi-k2.5"
 
-WORKDIR /workspace
+# Each rig gets its Mayor, Witness, Refinery, Deacon automatically
 ```
 
-Each task gets an ephemeral container with resource limits: `--memory=2g --cpus=1 --rm`. The repo is bind-mounted at `/workspace`. The GitHub installation token is passed as an environment variable for push access.
+Repo context: each target repo should include a `CLAUDE.md` (or equivalent for the worker agent) with repo conventions, architecture notes, and coding standards — Gastown loads this automatically.
 
-### LLM Routing
+### Cost Management
 
-A single LiteLLM proxy instance sits between OpenHands and LLM providers. Per-repo model selection is driven by the `model` field in the Mayor Registry — no agent code changes needed to swap providers.
-
-```yaml
-# litellm-config.yaml
-model_list:
-  - model_name: "anthropic/claude-sonnet-4-20250514"
-    litellm_params:
-      model: "claude-sonnet-4-20250514"
-      api_key: "sk-ant-..."
-
-  - model_name: "openai/gpt-4o"
-    litellm_params:
-      model: "gpt-4o"
-      api_key: "sk-..."
-
-  - model_name: "local/qwen-coder"
-    litellm_params:
-      model: "ollama/qwen2.5-coder-14b-instruct"
-      api_base: "http://host.docker.internal:11434"
-```
+The key insight from the Gastown community: use an expensive model (Opus) for the Mayor (coordination/decomposition) and cheap models (GLM-5, Kimi K2.5) for polecats (execution). This brings per-convoy costs from ~$100 (all-Opus) to ~$10-20 for typical tasks. The adapter enforces `maxBudgetUsd` from the Mayor Registry by monitoring Gastown's token metrics dashboard and killing convoys that exceed budget.
 
 ### GitHub App Setup
 
@@ -758,11 +728,7 @@ model_list:
 
 **Webhook events**: `issue_comment` (detect `@mayor` commands on PRs), `pull_request_review` (detect "changes requested"), `check_suite` (detect CI failures for auto-retry), `pull_request` (detect merges to update Hub status), `issues` (detect manual close/reopen of mirrored issues).
 
-The worker generates a fresh installation token at the start of each task. Tokens are short-lived (1 hour, refreshable to 8 hours).
-
-### Repo Context
-
-Each target repo should include an `.openhands/microagents/repo.md` file that OpenHands auto-loads at session start. This file contains repo-specific conventions, architecture notes, coding standards, and any instructions the agent needs to produce quality PRs. For monorepos, subdirectory-scoped context can be placed in nested microagent files.
+The adapter generates a fresh installation token at the start of each task. Tokens are short-lived (1 hour, refreshable to 8 hours). Tokens are passed to `gh` CLI inside Gastown for push access and PR creation.
 
 ---
 
@@ -782,9 +748,9 @@ The Hub dapp (client) communicates with the Hub server via REST:
 
 Votes, feedback submissions, and grouping actions go on-chain via the bridge (not through the server API). The server reads them from the chain.
 
-### Mayor Orchestrator API (internal)
+### Gastown Adapter API (internal)
 
-The Hub Server communicates with the Mayor Orchestrator via internal REST:
+The Hub Server communicates with the Gastown adapter via internal REST:
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -792,7 +758,7 @@ The Hub Server communicates with the Mayor Orchestrator via internal REST:
 | `/api/tasks/:id` | GET | Task status (queued / running / complete / failed) |
 | `/api/tasks/:id/cancel` | POST | Cancel a running task |
 
-The Mayor Orchestrator also receives GitHub webhooks directly (configured in the GitHub App settings).
+The Gastown adapter also receives GitHub webhooks directly (configured in the GitHub App settings) and relays `@mayor` commands to Gastown via `gt mail --stdin`.
 
 ## Repo Structure
 
@@ -815,7 +781,7 @@ usernode-dapp-starter/
 
 The widget is a single JS file that sends on-chain transactions. Core functionality (submitting feedback) has no dependency on the hub server — feedback is written to the chain, and the hub reads it from there. The optional ungrouped-feedback nudge requires the Hub Server API but degrades gracefully if unavailable.
 
-### `usernode-feedback-hub` (new repo — hub server + UI + mayor)
+### `usernode-feedback-hub` (new repo — hub server + UI + Gastown adapter)
 
 ```
 usernode-feedback-hub/
@@ -827,21 +793,17 @@ usernode-feedback-hub/
 │   ├── prioritizer.js            # AI priority scoring
 │   ├── thresholds.js             # vote counting, quorum checks, auto-promotion logic
 │   └── db.js                     # SQLite persistence for issues, groupings, pipeline state
-├── mayor/
-│   ├── orchestrator.js           # Express API + webhook handler
-│   ├── registry.js               # Mayor config per repo (reads config.json)
-│   ├── worker.js                 # BullMQ worker: sandbox → push → PR
-│   ├── sandbox.js                # Docker container lifecycle management
+├── adapter/
+│   ├── adapter.js                # Express API: receives tasks from Hub, relays webhooks
+│   ├── gastown-bridge.js         # Wraps gt/bd CLI calls with --json/--stdin
+│   ├── status-poller.js          # Polls convoy/bead status, reports to Hub Server
+│   ├── webhook-handler.js        # GitHub webhook → gt mail relay
 │   ├── github-app.js             # GitHub App auth + installation token management
-│   ├── github-issues.js          # GitHub Issue mirroring (create, sync, lifecycle)
-│   └── commands.js               # @mayor command parser for PR comments
-├── mayor-sandbox/
-│   └── Dockerfile                # Sandbox image for JS/Node agents
+│   └── commands.js               # @mayor command parser (unchanged)
 ├── lib/
 │   └── dapp-server.js            # shared utilities (copied from dapp-starter)
-├── config.json                   # Mayor registry (target_app → repo, model, limits)
-├── litellm-config.yaml           # LLM provider routing for the LiteLLM proxy
-├── docker-compose.yml            # Redis + LiteLLM proxy + Hub Server + Mayor Orchestrator
+├── config.json                   # Mayor registry (target_app → rig, models, limits)
+├── docker-compose.yml            # Hub Server + Gastown adapter + Gastown
 ├── .env                          # secrets (see Environment Variables)
 ├── AGENTS.md
 └── README.md
@@ -850,7 +812,7 @@ usernode-feedback-hub/
 ### Why the split
 
 - **Widget** is tiny client-side infrastructure (like the bridge). Anyone cloning dapp-starter to build a dapp gets feedback support for free.
-- **Hub** has operational complexity (AI services, GitHub integration, SQLite, LLM API keys, webhooks, Docker sandboxing, Redis) that doesn't belong in a template repo.
+- **Hub** has operational complexity (AI services, GitHub integration, SQLite, LLM API keys, webhooks, Gastown orchestration) that doesn't belong in a template repo.
 - They communicate through the chain, not through imports — the widget writes feedback transactions, the hub reads them. Clean boundary.
 
 ## Environment Variables
@@ -859,52 +821,50 @@ usernode-feedback-hub/
 |---|---|
 | `HUB_PUBKEY` | Shared feedback address (all feedback/votes sent here) |
 | `HUB_SECRET_KEY` | Not needed initially (no server-side sends) |
-| `LLM_API_KEY` | API key for the LLM used in collation and prioritization |
+| `LLM_API_KEY` | API key for the LLM used in collation and prioritization (separate from Gastown's agent models) |
 | `GITHUB_APP_ID` | GitHub App ID for the AI Mayor bot |
 | `GITHUB_APP_PRIVATE_KEY` | GitHub App private key (PEM format) |
 | `GITHUB_WEBHOOK_SECRET` | For verifying incoming GitHub webhook payloads |
-| `REDIS_URL` | Redis connection for BullMQ (default: `redis://localhost:6379`) |
-| `LITELLM_PROXY_URL` | LiteLLM proxy address (default: `http://localhost:4000`) |
-| `LITELLM_API_KEY` | Key for authenticating with the LiteLLM proxy |
-| `MAYOR_API_URL` | Internal URL of the Mayor Orchestrator (default: `http://localhost:3001`) |
+| `GASTOWN_HOME` | Gastown town directory (default: `~/gt`) |
+| `GASTOWN_MAYOR_MODEL` | Default Mayor model (can be overridden per-rig in config.json) |
+| `OPENROUTER_API_KEY` | API key for OpenRouter (for cheap worker models like GLM-5, Kimi) |
+| `MAYOR_API_URL` | Internal URL of the Gastown adapter (default: `http://localhost:3001`) |
 
-Per-repo configuration lives in `config.json` (Mayor Registry), not environment variables.
+Per-rig configuration lives in `config.json` (Mayor Registry), not environment variables.
 
 ## docker-compose.yml
 
 ```yaml
 version: "3.8"
 services:
-  redis:
-    image: redis:7-alpine
-    ports: ["6379:6379"]
-    volumes: ["redis-data:/data"]
-
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    ports: ["4000:4000"]
-    volumes: ["./litellm-config.yaml:/app/config.yaml"]
-    command: ["--config", "/app/config.yaml"]
-    env_file: .env
-
   hub-server:
     build: ./server
     ports: ["3000:3000"]
     env_file: .env
-    depends_on: [redis, litellm]
 
-  mayor-orchestrator:
-    build: ./mayor
+  gastown-adapter:
+    build: ./adapter
     ports: ["3001:3001"]
     env_file: .env
     volumes:
+      - gastown-home:/home/gastown/gt
+
+  gastown:
+    build:
+      context: .
+      dockerfile: gastown/Dockerfile
+    volumes:
+      - gastown-home:/home/gastown/gt
       - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/mayor-workspaces:/tmp/workspaces
-    depends_on: [redis, litellm]
+    env_file: .env
+    tty: true
+    stdin_open: true
 
 volumes:
-  redis-data:
+  gastown-home:
 ```
+
+Note: Gastown typically runs interactively in tmux. For a headless/daemon deployment, the Gastown container runs `gt` commands via the adapter's `child_process` calls. The container must have `tmux`, `gt`, `bd`, `gh`, and the configured agent CLIs (claude, opencode, etc.) installed.
 
 ## Widget Integration Checklist
 
@@ -984,17 +944,19 @@ Grouping transactions are lightweight:
 
 6. **Rate limiting**: Yes — max 5 feedback submissions per address per day, enforced on read (same pattern as HIM's survey creation rate limit).
 
-7. **LLM choice**: Model-agnostic via LiteLLM proxy. Per-repo model selection is configured in the Mayor Registry. The AI collation layer also uses LiteLLM and can use a different model than the coding agents.
+7. **LLM choice**: Model-agnostic. Gastown agent presets allow per-rig model selection (Mayor model + worker model configured in the Mayor Registry). The AI collation layer uses `LLM_API_KEY` directly and can use a different model than the coding agents.
 
 8. **Sybil resistance**: Handled at the L1 protocol layer as a core feature of Usernode. Not addressed at the application level.
 
 9. **Feedback grouping authority**: Users control their own feedback. The AI suggests groupings; only the original submitter can confirm (group) or remove (ungroup) their feedback from an issue. See "User-Controlled Grouping."
 
-10. **Agent repo targeting**: Each app has a target repo, path scope, model, concurrency limit, and budget defined in the Mayor Registry (`config.json`). See "Mayor Registry."
+10. **Agent repo targeting**: Each app has a target repo, path scope, Gastown rig, Mayor model, worker agent preset, polecat limit, and budget defined in the Mayor Registry (`config.json`). See "Mayor Registry."
 
-11. **Agent architecture**: Per-repo independent mayors backed by a deterministic Node.js orchestrator with BullMQ, OpenHands as the model-agnostic worker runtime, and Docker sibling containers for sandboxing. Gastown's naming convention adopted for clarity; Gastown not used as a dependency due to lack of API, model lock-in, and immaturity. See "Mayor Architecture."
+11. **Agent architecture**: Per-repo independent Gastown rigs, each with a Mayor (AI coordinator), polecats (model-agnostic workers), Refinery (merge queue), Witness (monitor), and Deacon (patrol). A thin Node.js adapter bridges the Feedback Hub and Gastown's CLI interface. Gastown was chosen over a custom BullMQ + OpenHands orchestrator because it provides task decomposition, merge management, worker monitoring, and crash recovery out of the box. The naming naturally aligns with the "mayor" metaphor that inspired the design.
 
 12. **GitHub auth for agents**: GitHub App (not PAT) for short-lived tokens, higher rate limits, per-repo permissions, and clean bot identity ("AI Mayor[bot]").
+
+13. **Large task handling**: Gastown's convoy model handles tasks of any scope. Small tasks (bugs, one-file fixes) are dispatched as single beads directly to polecats. Large tasks (new features, architectural changes) are dispatched as high-level beads that the Mayor decomposes into phased sub-bead sequences, executed by parallel polecats and merged by the Refinery. This tiered approach addresses the known limitation of single-agent systems on complex work (~11% success rate on feature-level benchmarks vs ~70% on bug fixes).
 
 ## Global Usernames
 
@@ -1045,34 +1007,36 @@ The Feedback Hub uses this module for displaying usernames on feedback submissio
 - Auto-promotion and auto-archive rules active
 - SQLite persistence for issue groupings and pipeline state
 
-### Phase 3a: Mayor Infrastructure
+### Phase 3a: Gastown Infrastructure
 
 **Repo: `usernode-feedback-hub`**
-- Set up GitHub App, Redis, LiteLLM proxy, docker-compose
-- Build Mayor Orchestrator: Express API, BullMQ queues, worker skeleton
-- Build sandbox Docker image (`mayor-sandbox/Dockerfile`)
-- Wire up Hub Server → Mayor Orchestrator task dispatch (POST `/api/tasks`)
-- Create `.openhands/microagents/repo.md` in each target repo
-- Test: manual task submission → sandbox runs → branch pushed
+- Install Gastown, Beads, tmux, and agent CLIs
+- Set up GitHub App
+- Initialize Gastown town with rigs for each target app
+- Configure agent presets (Mayor model + cheap worker models)
+- Create `CLAUDE.md` / repo context files in each target repo
+- Build the Gastown adapter: Express API, CLI bridge, status poller
+- Wire up Hub Server → adapter task dispatch (POST `/api/tasks`)
+- Test: manual task submission → beads created → convoy runs → branch pushed
 
-### Phase 3b: PR Pipeline
-
-**Repo: `usernode-feedback-hub`**
-- Implement PR creation via Octokit (draft PRs with labels, issue links)
-- Implement GitHub webhook handler for `@mayor` commands
-- Implement review feedback loop (comment → re-run agent → new commits on same branch)
-- Implement failure handling (`needs-help` label, retry counter, escalation to `manual`)
-- Wire up status reporting back to Hub Server (PR URL, merge detection)
-
-### Phase 3c: Agent Polish
+### Phase 3b: PR Pipeline + Feedback Loop
 
 **Repo: `usernode-feedback-hub`**
-- CI failure auto-retry via `check_suite` webhook
-- Per-repo model configuration tested across providers
-- Cost tracking and budget enforcement (`maxBudgetUsd`)
-- Task timeout handling
-- Concurrency limits per mayor enforced via BullMQ
-- Mayor performance metrics (success rate, time-to-merge, cost-per-PR)
+- Implement PR creation flow (polecats use `gh pr create`, adapter detects and reports to Hub)
+- Implement GitHub webhook handler for `@mayor` commands (adapter relays via `gt mail --stdin`)
+- Implement review feedback loop (comment → mail to Mayor/polecat → new commits)
+- Implement failure detection (stalled convoy → needs-help, repeated failure → manual)
+- Wire up status reporting back to Hub Server (convoy completion, PR URLs, merge detection)
+
+### Phase 3c: Agent Polish + Cost Management
+
+**Repo: `usernode-feedback-hub`**
+- Test Mayor-driven task decomposition on larger feature requests
+- Tune worker agent selection per rig (benchmark GLM-5 vs Kimi vs Sonnet on your codebases)
+- Implement cost tracking and budget enforcement via adapter
+- Test Refinery merge quality on parallel polecat output
+- Gastown Deacon patrol tuning (stuck agent detection thresholds)
+- Add convoy-level metrics to Hub's stats dashboard (success rate, cost-per-PR, time-to-merge)
 
 ### Phase 4: Polish + Scale
 
