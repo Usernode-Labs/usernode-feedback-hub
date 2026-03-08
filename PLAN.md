@@ -1,6 +1,6 @@
 ---
 name: Feedback Hub Full Build
-overview: Implement the full Feedback Hub system across both repos (usernode-dapp-starter for the widget, usernode-feedback-hub for the Hub dapp/server/Gastown instances), following the 4-phase roadmap in FEEDBACK_HUB_SPEC.md.
+overview: Implement the full Feedback Hub system across both repos (usernode-dapp-starter for the widget, usernode-feedback-hub for the Hub dapp/server/agent pipeline), following the 4-phase roadmap in FEEDBACK_HUB_SPEC.md.
 todos:
   - id: phase1a-widget
     content: "Phase 1A: Build usernode-feedback.js widget in dapp-starter (floating button, Shadow DOM, submit memo, progress bar, auto-detect target_app). Add serving routes. Embed in all example dapps."
@@ -12,7 +12,7 @@ todos:
     content: "Phase 2A: Add SQLite persistence (server/db.js) with tables for issues, feedback_items, votes, active_participants. Wire chain poller to write to DB."
     status: pending
   - id: phase2b-ai-collation
-    content: "Phase 2B: Build server/collator.js (AI grouping suggestions via LiteLLM) and server/prioritizer.js (priority scoring). Run on schedule + on new feedback."
+    content: "Phase 2B: Build server/collator.js (AI grouping suggestions via LLM) and server/prioritizer.js (priority scoring). Run on schedule + on new feedback."
     status: pending
   - id: phase2c-hub-grouping-voting
     content: "Phase 2C: Expand hub/index.html with Issue List, Issue Detail, and enhanced My Feedback screens. Add group/ungroup/vote transaction sending. State derivation with conflict resolution."
@@ -23,17 +23,11 @@ todos:
   - id: phase2e-api
     content: "Phase 2E: Expand Hub Server REST API (/api/issues, /api/issues/:id, /api/feedback/ungrouped, /api/stats, /api/apps)."
     status: pending
-  - id: phase3a-infra
-    content: "Phase 3a: Build Gastown instance container (Dockerfile, start.js, adapter). Write generate-compose.js. Set up GitHub App. Create config.json with all apps. Build per-instance adapter (adapter.js, gastown-bridge.js, status-poller.js, webhook-handler.js, github-app.js). Wire Hub Server -> per-instance task dispatch."
-    status: pending
-  - id: phase3b-pr-pipeline
-    content: "Phase 3b: PR creation flow (polecats use gh pr create, adapter detects + reports). GitHub webhook handler for @mayor commands (adapter relays via gt mail). Review feedback loop. Failure detection (stalled convoy -> needs-help, repeated -> manual)."
-    status: pending
-  - id: phase3c-polish
-    content: "Phase 3c: Test Mayor task decomposition on large features. Tune worker agent selection per rig. Cost tracking + budget enforcement via adapter. Refinery merge quality testing. Deacon patrol tuning. Convoy-level metrics."
+  - id: phase3-agent-pipeline
+    content: "Phase 3: AI Agent Pipeline — GitHub App setup, dispatch.js (create GitHub Issues via Octokit), status.js (poll GitHub API for PRs), CLAUDE.md + claude-agent.yml in each target repo, ANTHROPIC_API_KEY secrets, end-to-end testing."
     status: pending
   - id: phase4-scale
-    content: "Phase 4: Screenshot support in widget, notification badges, stats/leaderboard screen, mayor dashboard, multi-repo issues, community-governed merges evaluation."
+    content: "Phase 4: Screenshot support in widget, notification badges, stats/leaderboard screen, agent dashboard, multi-repo issues, community-governed merges evaluation."
     status: pending
 isProject: false
 ---
@@ -47,7 +41,7 @@ isProject: false
 
 ## Repo Boundary
 
-Per the spec, the **widget** (`usernode-feedback.js`) lives in `usernode-dapp-starter` alongside the bridge and usernames module. The **Hub dapp, Hub Server, and Gastown instance containers** live in `usernode-feedback-hub`. They communicate only through on-chain transactions (widget writes, hub reads).
+Per the spec, the **widget** (`usernode-feedback.js`) lives in `usernode-dapp-starter` alongside the bridge and usernames module. The **Hub dapp and Hub Server** live in `usernode-feedback-hub`. The **GitHub Action** (`.github/workflows/claude-agent.yml`) lives in each target repo. They communicate only through on-chain transactions (widget writes, hub reads) and the GitHub API (hub creates issues, action creates PRs).
 
 ---
 
@@ -109,7 +103,7 @@ This `APP_PUBKEY` becomes `HUB_PUBKEY` — the shared address for all feedback/v
   - Runs a chain poller (`createChainPoller`) to index feedback transactions into memory (for Phase 2's API)
   - Exposes `GET /api/feedback` — returns indexed feedback (simple JSON, no DB yet)
 - Copy `lib/dapp-server.js` from examples (shared server utilities)
-- Update `Dockerfile` and `docker-compose.yml` for the hub server
+- Update `Dockerfile` for the hub server
 
 **Cleanup:** Remove the example dapps (`examples/him`, `examples/last-one-wins`, `examples/falling-sands`, `examples/server.js`) from the feedback-hub repo — they belong in dapp-starter. Keep `lib/dapp-server.js`.
 
@@ -182,83 +176,37 @@ Expand `server/server.js` with the full API surface:
 
 ---
 
-## Phase 3a: Gastown Infrastructure
+## Phase 3: AI Agent Pipeline
 
-### Gastown Instance Container
+### GitHub App + Repo Setup
 
-- Create `gastown/Dockerfile` — single image used by all rig instances: Node.js + Go + gt + bd + tmux + gh + agent CLIs
-- Create `gastown/start.js` — entrypoint: first-boot setup (`gt install`, `gt rig add $RIG_NAME $REPO_URL`, agent preset config from env vars), then starts adapter HTTP server on port 3001
-- Create `gastown/adapter.js` — Express API:
-  - `POST /api/tasks` — accept task spec from Hub Server, translate to `bd create` + `gt convoy create` + `gt sling`
-  - `GET /api/tasks/:id` — task status (polls `gt convoy list --json`)
-  - `POST /api/tasks/:id/cancel` — cancel running task
-- Create `gastown/gastown-bridge.js` — wraps `gt`/`bd` CLI calls with `--json`/`--stdin` via `child_process.execSync`
-- Create `gastown/status-poller.js` — `setInterval` (30s) polling convoy/bead status, POSTs updates to Hub Server at `$HUB_SERVER_URL`
-- Create `gastown/webhook-handler.js` — receives GitHub webhooks forwarded by Hub Server, relays `@mayor` commands via `gt mail --stdin`
-- Create `gastown/github-app.js` — GitHub App auth via `@octokit/auth-app`, installation token generation
-- Create `gastown/commands.js` — `@mayor` command parser (revise, retry, explain, scope, abort)
-
-### Compose Generation
-
-- Create `scripts/generate-compose.js` — reads `config.json`, emits `docker-compose.yml` with:
-  - `hub-server` service (static)
-  - One `gastown-<rig>` service per app entry, parameterized by env vars (`RIG_NAME`, `REPO_URL`, `REPO_PATH`, `MAYOR_MODEL`, `WORKER_AGENT`, `MAX_POLECATS`, `MAX_BUDGET_USD`, `HUB_SERVER_URL`)
-  - Named volumes: `hub-data` + one per rig
-  - Port mapping: 3101, 3102, ... for each instance (internal port always 3001)
-- Create `config.json` — top-level `settings` (voting thresholds, collation interval, polling intervals) + `apps` map (per-app identity, repo targeting, Gastown config)
-
-### GitHub App + Repo Context
-
-- Set up GitHub App (permissions: Contents, PRs, Issues R/W; Metadata, Checks R)
-- Create `CLAUDE.md` / repo context files in each target repo
+- Create a GitHub App for Hub Server (permissions: Issues R/W, PRs Read, Metadata Read)
+- Create `config.json` — top-level `settings` (voting thresholds, collation interval, polling intervals) + `apps` map (per-app identity + repo targeting)
+- Write `CLAUDE.md` for each target repo (conventions, scoping rules, test commands)
+- Add `.github/workflows/claude-agent.yml` to each target repo
+- Set `ANTHROPIC_API_KEY` as a GitHub Actions secret in each target repo
 
 ### Hub Server Integration
 
-- Wire `server/server.js` to POST task specs to per-rig Gastown instances (`http://gastown-<rig>:3001`) when issues reach "ready" status
-- Hub Server routes incoming GitHub webhooks to the appropriate instance based on repo in payload
+- Create `server/dispatch.js` — creates GitHub Issues via Octokit when issues reach "ready":
+  - Title: `[Feedback Hub] <issue title>`
+  - Body: summary, vote results, grouped feedback items, target path hint, link to Hub
+  - Labels: `ai-mayor`, category label
+- Create `server/status.js` — polls GitHub API (every 5 minutes) for PR status:
+  - Detects PR creation → updates to "pr-open"
+  - Detects PR merge → updates to "merged"
+  - Detects PR close → updates to "archived" or back to "ready"
+  - Detects timeout (no PR within 30 minutes) → "needs-help"
+  - Tracks failed attempts; after 3 → "manual"
+- Create `server/github-app.js` — GitHub App auth via `@octokit/auth-app`, installation token management
 - Add `GET /api/issues/:id/spec` — AI-generated task spec endpoint
+- Wire Hub dapp to show GitHub Issue + PR links in pipeline status UI
 
----
+### Testing
 
-## Phase 3b: PR Pipeline + Feedback Loop
-
-### GitHub Issue Mirroring
-
-- Hub Server creates GitHub Issues when issues reach "ready" (title, summary, vote results, labels)
-- Store GitHub Issue number/URL in DB
-
-### PR Creation Flow
-
-- Polecats create PRs via `gh pr create` with `Fixes #N`, labels `ai-generated` + app name
-- Instance adapter detects convoy completion via status polling, reports PR URL to Hub Server
-
-### Review Feedback Loop
-
-- Hub Server receives GitHub webhooks, routes to appropriate Gastown instance by repo
-- Instance webhook handler in `gastown/webhook-handler.js`:
-  - `issue_comment` — detect `@mayor` commands, relay via `gt mail --stdin` to Mayor/polecat
-  - `pull_request` — detect merges, report to Hub Server
-  - `pull_request_review` — detect "changes requested"
-  - `issues` — detect manual close/reopen of mirrored issues
-- Mayor/polecat receives mail, processes instruction, pushes new commits
-
-### Failure Handling
-
-- Gastown Deacon detects stuck agents; GUPP handles crash recovery via bead persistence
-- Instance adapter detects stalled convoys, creates PR with `needs-help` label + explanation
-- Track stalled convoy count per issue; after 3 failures, move to "manual" status
-- Hub dapp shows "needs-help" and "manual" states with explanation
-
----
-
-## Phase 3c: Agent Polish + Cost Management
-
-- Test Mayor-driven task decomposition on larger feature requests
-- Tune worker agent selection per rig (benchmark GLM-5 vs Kimi vs Sonnet on target codebases)
-- Cost tracking: monitor Gastown's token metrics dashboard, enforce `maxBudgetUsd` per convoy via adapter
-- Test Refinery merge quality on parallel polecat output
-- Gastown Deacon patrol tuning (stuck agent detection thresholds)
-- Add convoy-level metrics to Hub's stats dashboard (success rate, cost-per-PR, time-to-merge)
+- End-to-end: manually promote an issue → GitHub Issue created → Action runs → PR opened
+- Review loop: comment `@claude` on the PR → Action re-triggers → new commits
+- Failure path: timeout detection, "needs-help" status, 3-failure → "manual"
 
 ---
 
@@ -272,7 +220,7 @@ Expand `server/server.js` with the full API surface:
 ### In `usernode-feedback-hub`:
 
 - Stats/Leaderboard screen: top contributors, pipeline throughput, per-app breakdown
-- Mayor performance dashboard: success rate, avg time ready-to-merged, cost metrics
+- Agent performance dashboard: success rate, avg time ready-to-merged, cost metrics
 - Multi-repo issue support (issues spanning multiple repos)
 - Evaluate community-governed merges (auto-merge after community vote on PR)
 
@@ -297,32 +245,26 @@ flowchart TB
     VoteTx["vote txs"]
   end
 
-  subgraph feedbackHub ["usernode-feedback-hub (hub-server container)"]
+  subgraph feedbackHub ["usernode-feedback-hub"]
     HubDapp["hub/index.html"]
     HubServer["server/server.js"]
     Collator["server/collator.js"]
+    Dispatch["server/dispatch.js"]
+    Status["server/status.js"]
     Thresholds["server/thresholds.js"]
     DB["SQLite"]
   end
 
-  subgraph gastownInstances ["Gastown Instances (1 container per rig)"]
-    subgraph himInst ["gastown-him"]
-      HimAdapter["adapter"]
-      HimGt["gt runtime"]
-    end
-    subgraph fsInst ["gastown-falling-sands"]
-      FsAdapter["adapter"]
-      FsGt["gt runtime"]
-    end
-    subgraph hubInst ["gastown-feedback-hub"]
-      HubAdapter["adapter"]
-      HubGt["gt runtime"]
-    end
+  subgraph targetRepos ["Target Repos (GitHub)"]
+    Action1[".github/workflows/claude-agent.yml"]
+    CLAUDE1["CLAUDE.md"]
+    PR1["Pull Requests"]
   end
 
   subgraph external ["External Services"]
     GitHub["GitHub API"]
     LLM["LLM Providers"]
+    Anthropic["Anthropic API (via GitHub Action)"]
   end
 
   Widget -->|sendTransaction| SubmitTx
@@ -333,21 +275,14 @@ flowchart TB
   HubServer -->|chain poller| GroupTx
   HubServer -->|chain poller| VoteTx
   HubServer --> DB
-  HubServer -->|"POST /tasks"| HimAdapter
-  HubServer -->|"POST /tasks"| FsAdapter
-  HubServer -->|"POST /tasks"| HubAdapter
-  HubServer -->|webhooks| HimAdapter
+  Dispatch -->|"Octokit: create issue"| GitHub
+  Status -->|"Octokit: poll PRs"| GitHub
   Collator --> LLM
-  HimAdapter -->|"gt/bd CLI"| HimGt
-  FsAdapter -->|"gt/bd CLI"| FsGt
-  HubAdapter -->|"gt/bd CLI"| HubGt
-  HimGt -->|"gh pr create"| GitHub
-  FsGt -->|"gh pr create"| GitHub
-  HubGt -->|"gh pr create"| GitHub
-  Thresholds -->|"issue ready"| GitHub
+  GitHub -->|"issue created (ai-mayor label)"| Action1
+  Action1 -->|"Claude Code runs"| Anthropic
+  Action1 -->|"opens PR"| PR1
+  Thresholds -->|"issue ready"| Dispatch
 ```
-
-
 
 ## Key Technical Decisions
 
@@ -355,14 +290,13 @@ flowchart TB
 - **Hub Server and Hub dapp are co-deployed** on the same origin (relative API paths like `/api/issues`)
 - **Chain poller is the source of truth bridge** — all on-chain data (feedback, groups, votes) flows through the poller into SQLite; the REST API reads from SQLite
 - **AI suggestions are off-chain** (stored in SQLite); user confirmations are on-chain (`group`/`ungroup` txs)
-- **Gastown for agent orchestration** — task decomposition (Mayor), merge queue (Refinery), worker monitoring (Witness + Deacon), crash recovery (GUPP + Beads) all built-in; thin per-instance Node.js adapter wraps CLI
-- **One container per rig** — `docker-compose.yml` generated from `config.json` by `scripts/generate-compose.js`; each rig is independently restartable and resource-limitable; natural unit for future decentralization
-- **Split Mayor/worker models** — expensive model (Opus) for Mayor coordination, cheap models (GLM-5, Kimi) for polecats; ~$10-20 per convoy vs ~$100 all-Opus
-- **Git worktrees for isolation** — lighter than Docker containers, naturally integrates with Git-based PR workflows
-- **GitHub App for auth** — short-lived installation tokens, bot identity, webhook support
+- **`claude-code-action` for the agent layer** — zero custom infrastructure; the entire agent is a YAML file per repo. Sub-agents handle large tasks (independent 200K context windows). Swappable to OpenHands, Codex, or Gemini Actions by editing the YAML.
+- **Hub Server creates GitHub Issues, not custom task queues** — the interface between the Hub and the agent is a labeled GitHub Issue. Any Action that triggers on that label and produces a PR works.
+- **GitHub App for Hub Server auth** — short-lived installation tokens for issue creation and status polling. Anthropic credentials are separate GitHub Actions secrets per repo.
+- **Single container deployment** — just the Hub Server + SQLite. No Redis, no agent containers, no LiteLLM proxy.
 
 ## Dependencies to Add
 
-- **`usernode-feedback-hub`**: `better-sqlite3`, `@octokit/rest`, `@octokit/auth-app`, `@octokit/webhooks`, `express` (or keep raw http like server.js). Gastown + Beads installed via their own CLIs (not npm).
+- **`usernode-feedback-hub`**: `better-sqlite3`, `@octokit/rest`, `@octokit/auth-app`, `@octokit/webhooks` (optional), `express` (or keep raw http like server.js)
 - **`usernode-dapp-starter`**: No new dependencies (widget is zero-dependency like the bridge)
-
+- **Each target repo**: `ANTHROPIC_API_KEY` GitHub Actions secret, `.github/workflows/claude-agent.yml`, `CLAUDE.md`
