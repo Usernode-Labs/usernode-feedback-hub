@@ -37,7 +37,7 @@ isProject: false
 ## Current State
 
 - `**usernode-feedback-hub**`: Clone of dapp-starter with `FEEDBACK_HUB_SPEC.md` added. No hub-specific code exists yet. Has the full dapp-starter infrastructure (bridge, usernames, server, examples, Docker, deploy workflow).
-- `**usernode-dapp-starter**`: Production repo with bridge, usernames, server, and example dapps (HIM, Last One Wins, Falling Sands). No widget yet.
+- `**usernode-dapp-starter**`: Production repo with bridge, usernames, server, and example dapps (Opinion Market, Last One Wins, Falling Sands). No widget yet.
 
 ## Repo Boundary
 
@@ -57,19 +57,19 @@ Build `usernode-feedback.js` — a self-contained script that adds a floating fe
 - Auto-detects `target_app` from `data-app` attribute, then `location.pathname`, then `"unknown"`
 - Configurable via `data-hub-url` and `data-hub-api` attributes on the script tag
 - Uses the bridge's `sendTransaction` to submit feedback on-chain (no server dependency)
-- Progress bar during submission (same pattern as HIM/Last One Wins)
+- Progress bar during submission (same pattern as Opinion Market/Last One Wins)
 
 **Files to create/modify:**
 
 - Create `usernode-feedback.js` at repo root — floating button + form, Shadow DOM, memo format `{ app: "feedback", type: "submit", target_app, category, text }`
 - Modify `server.js` — add serving route for `/usernode-feedback.js` (same pattern as bridge/usernames: `no-store` cache header)
 - Modify `examples/server.js` — same serving route
-- Modify each dapp HTML to include: `<script src="/usernode-feedback.js" data-app="him"></script>` (and equivalent for lastwin, falling-sands, starter)
+- Modify each dapp HTML to include: `<script src="/usernode-feedback.js" data-app="opinion-market"></script>` (and equivalent for lastwin, falling-sands, starter)
 
 **Memo schema:**
 
 ```json
-{ "app": "feedback", "type": "submit", "target_app": "him", "category": "bug", "text": "..." }
+{ "app": "feedback", "type": "submit", "target_app": "opinion-market", "category": "bug", "text": "..." }
 ```
 
 Categories: `bug`, `feature`, `improvement`, `other`. Max text ~900 chars (JSON overhead ~75 chars within 1024 limit).
@@ -88,7 +88,7 @@ This `APP_PUBKEY` becomes `HUB_PUBKEY` — the shared address for all feedback/v
 
 **Files to create:**
 
-- `hub/index.html` — single-file dapp (follows HIM pattern: IIFE, dark/light theme, mobile-first layout, hash routing)
+- `hub/index.html` — single-file dapp (follows Opinion Market pattern: IIFE, dark/light theme, mobile-first layout, hash routing)
   - Screens: **Feed** (all feedback, filterable by app/category), **My Feedback** (user's submissions)
   - Includes bridge + usernames scripts
   - Polls `getTransactions({ account: HUB_PUBKEY })` every 4 seconds
@@ -105,7 +105,7 @@ This `APP_PUBKEY` becomes `HUB_PUBKEY` — the shared address for all feedback/v
 - Copy `lib/dapp-server.js` from examples (shared server utilities)
 - Update `Dockerfile` for the hub server
 
-**Cleanup:** Remove the example dapps (`examples/him`, `examples/last-one-wins`, `examples/falling-sands`, `examples/server.js`) from the feedback-hub repo — they belong in dapp-starter. Keep `lib/dapp-server.js`.
+**Cleanup:** Remove the example dapps (`examples/opinion-market`, `examples/last-one-wins`, `examples/falling-sands`, `examples/server.js`) from the feedback-hub repo — they belong in dapp-starter. Keep `lib/dapp-server.js`.
 
 ---
 
@@ -234,7 +234,7 @@ flowchart TB
     Widget["usernode-feedback.js"]
     Bridge["usernode-bridge.js"]
     Usernames["usernode-usernames.js"]
-    HIM["HIM dapp"]
+    OM["Opinion Market dapp"]
     LOW["Last One Wins"]
     FS["Falling Sands"]
   end
@@ -286,7 +286,7 @@ flowchart TB
 
 ## Key Technical Decisions
 
-- **Hub dapp is a single HTML file** following the same pattern as HIM (IIFE, inline CSS/JS, bridge + usernames, hash routing, dark/light theme, tx progress bar)
+- **Hub dapp is a single HTML file** following the same pattern as Opinion Market (IIFE, inline CSS/JS, bridge + usernames, hash routing, dark/light theme, tx progress bar)
 - **Hub Server and Hub dapp are co-deployed** on the same origin (relative API paths like `/api/issues`)
 - **Chain poller is the source of truth bridge** — all on-chain data (feedback, groups, votes) flows through the poller into SQLite; the REST API reads from SQLite
 - **AI suggestions are off-chain** (stored in SQLite); user confirmations are on-chain (`group`/`ungroup` txs)

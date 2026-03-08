@@ -14,7 +14,7 @@ Dapps are lightweight web apps (single HTML files) that run inside the mobile ap
 
 The dapp-starter repo (`usernode-dapp-starter`) contains the bridge, a dev server with mock endpoints, and several example dapps:
 
-- **Human Input Market (HIM)** — A prediction market where users vote on questions and bet credits on outcomes using a Dynamic Parimutuel Market mechanism. Votes are hidden until reveal checkpoints. Markets settle based on vote results. Features a credit system, leaderboard, and voter dividends.
+- **Opinion Market** — A prediction market where users vote on questions and bet credits on outcomes using a Dynamic Parimutuel Market mechanism. Votes are hidden until reveal checkpoints. Markets settle based on vote results. Features a credit system, leaderboard, and voter dividends.
 - **Last One Wins** — A token game where players send tokens to a shared pot. If nobody sends for 24 hours, the last sender wins everything. Has server-side automated payouts.
 - **Falling Sands** — A collaborative pixel sandbox where users draw with physics-simulated elements. Strokes are committed on-chain and a server runs a WASM physics engine streamed to all clients via WebSocket.
 
@@ -40,10 +40,10 @@ A concrete walkthrough of a bug report going from feedback to merged PR. This tr
 
 ### Day 0: Three users notice the same bug
 
-**Alice** is using HIM on her phone. She sells shares in a market but the balance display still shows the old number. She taps the feedback button (bottom-right corner), selects "Bug", types "After selling shares, my balance doesn't update until I refresh the page", and hits Submit.
+**Alice** is using Opinion Market on her phone. She sells shares in a market but the balance display still shows the old number. She taps the feedback button (bottom-right corner), selects "Bug", types "After selling shares, my balance doesn't update until I refresh the page", and hits Submit.
 
 Behind the scenes:
-- The widget calls `sendTransaction(HUB_PUBKEY, 1, '{"app":"feedback","type":"submit","target_app":"him","category":"bug","text":"After selling shares, my balance doesn't update until I refresh the page"}')` via the bridge
+- The widget calls `sendTransaction(HUB_PUBKEY, 1, '{"app":"feedback","type":"submit","target_app":"opinion-market","category":"bug","text":"After selling shares, my balance doesn't update until I refresh the page"}')` via the bridge
 - The transaction lands on-chain within ~30–90 seconds (progress bar shows status)
 - The widget shows "Thanks! Your feedback is on-chain." and closes
 
@@ -56,8 +56,8 @@ The Hub Server's chain poller picks up all three new `submit` transactions. The 
 The AI (via LiteLLM proxy) compares the three items against existing issues in SQLite. No match found — these are new. The AI clusters them together and creates a new suggested issue:
 - **Issue ID**: `fb-042`
 - **Title**: "Balance doesn't update after selling shares"
-- **Summary**: "Three users report that selling shares in HIM does not refresh the displayed balance. Users must manually reload the page to see the updated amount."
-- **Target app**: `him`
+- **Summary**: "Three users report that selling shares in Opinion Market does not refresh the displayed balance. Users must manually reload the page to see the updated amount."
+- **Target app**: `opinion-market`
 - **Category**: `bug`
 - **Priority**: 4 (high — blocks core functionality, multiple reports)
 
@@ -81,9 +81,9 @@ This is Alice's on-chain confirmation that she agrees with the AI's grouping. Bo
 
 ### Days 1–3: Community votes
 
-The Hub dapp shows `fb-042` in the issue list with its current vote tally. HIM has 90 active users (unique senders in the last 30 days).
+The Hub dapp shows `fb-042` in the issue list with its current vote tally. Opinion Market has 90 active users (unique senders in the last 30 days).
 
-Over the next few days, community members browse the Hub, filter by "HIM" and "Bug", and vote. Each vote is an on-chain transaction:
+Over the next few days, community members browse the Hub, filter by "Opinion Market" and "Bug", and vote. Each vote is an on-chain transaction:
 `sendTransaction(HUB_PUBKEY, 1, '{"app":"feedback","type":"vote","issue":"fb-042","value":"yes"}')`
 
 By Day 3: 35 votes — 31 yes, 4 no.
@@ -100,7 +100,7 @@ The Hub Server:
 2. Creates a GitHub Issue in `org/usernode-dapp-starter` via the GitHub App:
    - Title: "Balance doesn't update after selling shares"
    - Body: summary, vote results ("31 yes / 4 no — 89% approval"), grouped feedback items with usernames, link to Hub detail page
-   - Labels: `feedback-hub`, `him`, `bug`
+   - Labels: `feedback-hub`, `opinion-market`, `bug`
    - → GitHub Issue **#42** is created
 3. Updates `fb-042` status to **"in-progress"**
 
@@ -110,8 +110,8 @@ The GitHub Action (`.github/workflows/claude-agent.yml`) in `org/usernode-dapp-s
 
 Claude Code runs on a GitHub Actions runner:
 1. Reads `CLAUDE.md` for project conventions
-2. Reads GitHub Issue #42 for full context (summary, feedback items, scope hint: `dapps/him/`)
-3. Examines `dapps/him/him.html`, finds the sell handler doesn't call `refreshLoopOnce()` after the transaction completes
+2. Reads GitHub Issue #42 for full context (summary, feedback items, scope hint: `dapps/opinion-market/`)
+3. Examines `dapps/opinion-market/opinion-market.html`, finds the sell handler doesn't call `refreshLoopOnce()` after the transaction completes
 4. Adds the missing `await refreshLoopOnce();` call
 5. Runs linting (eslint, prettier) — passes
 6. Commits: `fix: refresh balance display after share sale`
@@ -119,7 +119,7 @@ Claude Code runs on a GitHub Actions runner:
 8. Opens a draft PR:
    - Title: `Fix: Balance doesn't update after selling shares`
    - Body: `Fixes #42` + summary + link to Hub issue
-   - Labels: `ai-generated`, `him`
+   - Labels: `ai-generated`, `opinion-market`
 
 Hub Server detects the PR via GitHub API polling → status updated to **"pr-open"**
 
@@ -207,7 +207,7 @@ The widget auto-detects which dapp it's running in via `document.title` or a `da
 
 ### 2. Feedback Hub (dapp UI)
 
-A new dapp (single HTML file, same pattern as HIM / Last One Wins) where users browse AI-suggested issue groupings, accept or reject grouping of their own feedback, vote on issues, and track pipeline status. Served by the Hub Server on the same origin, so REST API calls use relative paths (`/api/issues`, etc.). Must include `usernode-bridge.js` and `usernode-usernames.js` for chain interaction and identity.
+A new dapp (single HTML file, same pattern as Opinion Market / Last One Wins) where users browse AI-suggested issue groupings, accept or reject grouping of their own feedback, vote on issues, and track pipeline status. Served by the Hub Server on the same origin, so REST API calls use relative paths (`/api/issues`, etc.). Must include `usernode-bridge.js` and `usernode-usernames.js` for chain interaction and identity.
 
 If the Hub Server is unavailable, the dapp should degrade gracefully — show raw on-chain feedback and votes with a "server unavailable" banner, since AI-enriched data (issue titles, suggestions, pipeline status) requires the server.
 
@@ -235,13 +235,13 @@ All feedback, grouping actions, and votes are on-chain transactions sent to a si
 
 | Type | Memo | Notes |
 |---|---|---|
-| `submit` | `{ app: "feedback", type: "submit", target_app: "him", category: "bug", text: "..." }` | Raw feedback submission |
+| `submit` | `{ app: "feedback", type: "submit", target_app: "opinion-market", category: "bug", text: "..." }` | Raw feedback submission |
 | `group` | `{ app: "feedback", type: "group", feedback_tx: "tx_hash", issue: "issue_id" }` | User assigns their own feedback to a suggested issue. Only the original submitter of `feedback_tx` can do this. |
 | `ungroup` | `{ app: "feedback", type: "ungroup", feedback_tx: "tx_hash" }` | User removes their feedback from its current issue grouping. Only the original submitter can do this. |
 | `vote` | `{ app: "feedback", type: "vote", issue: "issue_id", value: "yes" }` | Vote yes or no on an issue. Latest per user per issue wins. |
 
 Notes:
-- `target_app` identifies which dapp the feedback is about (e.g., `"him"`, `"lastwin"`, `"falling-sands"`, `"starter"`)
+- `target_app` identifies which dapp the feedback is about (e.g., `"opinion-market"`, `"lastwin"`, `"falling-sands"`, `"starter"`)
 - `category` is one of: `"bug"`, `"feature"`, `"improvement"`, `"other"`
 - `value` in votes is `"yes"` or `"no"`
 - `issue` references a server-assigned issue ID (AI grouping suggestions create these). Users discover issue IDs via the Hub dapp UI — grouping requires visiting the Hub.
@@ -282,12 +282,12 @@ The app registry (`config.json`) is the single source of truth for all known app
     }
   },
   "apps": {
-    "him": {
-      "displayName": "Human Input Market",
+    "opinion-market": {
+      "displayName": "Opinion Market",
       "pubkey": "ut1...",
-      "url": "https://dapps.usernodelabs.org/him",
+      "url": "https://dapps.usernodelabs.org/opinion-market",
       "repo": "org/usernode-dapp-starter",
-      "path": "dapps/him/"
+      "path": "dapps/opinion-market/"
     },
     "lastwin": {
       "displayName": "Last One Wins",
@@ -382,8 +382,8 @@ A small floating button in the bottom-right corner of every dapp. Tapping it ope
 ### Auto-Detection
 
 The widget determines `target_app` automatically:
-1. If the `<script>` tag has `data-app="him"`, use that
-2. Otherwise, infer from `location.pathname` (e.g., `/him` → `"him"`, `/last-one-wins` → `"lastwin"`)
+1. If the `<script>` tag has `data-app="opinion-market"`, use that
+2. Otherwise, infer from `location.pathname` (e.g., `/opinion-market` → `"opinion-market"`, `/last-one-wins` → `"lastwin"`)
 3. Fallback: `"unknown"`
 
 The widget accepts optional configuration via `data-` attributes on the script tag:
@@ -460,7 +460,7 @@ An issue is considered **passing** when:
 
 **Eligible participants** are determined at vote time: a user's vote counts toward quorum if they were an active participant in the target app (had at least one on-chain transaction to that app's address) within the 30 days preceding their vote submission. The quorum denominator for threshold checks is the count of active participants at the time the threshold is evaluated (i.e., the active user count at the moment the server runs its promotion check).
 
-**Example**: At threshold-check time, HIM has 90 active users (unique senders in the last 30 days). An issue about HIM needs > 30 voters who were each active at the time they voted, with > 2/3 yes votes, to pass.
+**Example**: At threshold-check time, Opinion Market has 90 active users (unique senders in the last 30 days). An issue about Opinion Market needs > 30 voters who were each active at the time they voted, with > 2/3 yes votes, to pass.
 
 For issues tagged with multiple apps, the quorum is based on the union of active participants across all tagged apps.
 
@@ -487,7 +487,7 @@ The Hub dapp shows issues in a list:
 ```
 ┌─────────────────────────────────────────┐
 │ ★ Sell button doesn't update balance    │
-│ HIM · Bug · 3 reports · Score: 4        │
+│ Opinion Market · Bug · 3 reports · Score: 4        │
 │                                         │
 │ 23 yes / 4 no  ████████████░░  85%      │
 │ Quorum: 27/30 (90%)                     │
@@ -541,7 +541,7 @@ The GitHub Issue includes:
   - List of grouped feedback items (submitter username, text, timestamp)
   - AI priority score
   - Link to the Hub dapp issue detail page (e.g., `https://hub.usernodelabs.org/#issue/fb-042`)
-- **Labels**: `feedback-hub`, app label (e.g., `him`), category label (e.g., `bug`)
+- **Labels**: `feedback-hub`, app label (e.g., `opinion-market`), category label (e.g., `bug`)
 
 ### Lifecycle Sync
 
@@ -689,7 +689,7 @@ Each target repo should include a `CLAUDE.md` file at its root. This is the sing
 - Repo architecture overview (what the dapp does, how it's structured)
 - Coding conventions (style, naming, patterns used)
 - Test and lint commands (`npm test`, `npx eslint .`, etc.)
-- Scoping rules for monorepos (e.g., "When working on HIM, only modify files in `dapps/him/`")
+- Scoping rules for monorepos (e.g., "When working on Opinion Market, only modify files in `dapps/opinion-market/`")
 - Branch naming convention: `claude/issue-{N}-{slug}`
 - PR conventions: draft PRs, link back to the originating Feedback Hub issue
 - Any known gotchas or architectural constraints
@@ -801,7 +801,7 @@ usernode-dapp-starter/
 ├── usernode-feedback.js          # shared — feedback widget (NEW)
 ├── server.js                     # serves all three shared scripts
 ├── examples/
-│   ├── him/him.html              # includes feedback widget
+│   ├── opinion-market/opinion-market.html  # includes feedback widget
 │   ├── last-one-wins/index.html  # includes feedback widget
 │   └── falling-sands/index.html  # includes feedback widget
 └── ...
@@ -882,8 +882,8 @@ Adding a new app to the ecosystem: edit `config.json` (add the app entry), add `
 The widget lives in `usernode-dapp-starter` and is served by the same server that serves the bridge and usernames module. For each dapp that wants the feedback button:
 
 1. Include the script: `<script src="/usernode-feedback.js"></script>`
-2. Optionally set the app name: `<script src="/usernode-feedback.js" data-app="him"></script>`
-3. Optionally configure Hub links: `<script src="/usernode-feedback.js" data-app="him" data-hub-url="https://hub.usernodelabs.org" data-hub-api="https://hub.usernodelabs.org"></script>`
+2. Optionally set the app name: `<script src="/usernode-feedback.js" data-app="opinion-market"></script>`
+3. Optionally configure Hub links: `<script src="/usernode-feedback.js" data-app="opinion-market" data-hub-url="https://hub.usernodelabs.org" data-hub-api="https://hub.usernodelabs.org"></script>`
 4. That's it. The widget handles everything else.
 
 The widget needs the bridge to be loaded first (it calls `sendTransaction`). It should be included after `usernode-bridge.js`. Core functionality (submitting feedback) works without the Hub Server — it writes directly to the chain. The `data-hub-api` attribute enables the optional ungrouped-feedback dot indicator.
@@ -892,7 +892,7 @@ The widget needs the bridge to be loaded first (it calls `sendTransaction`). It 
 
 ### Issue List (default view)
 
-- Filter bar: app (all / HIM / Last One Wins / Falling Sands / ...), category (all / bug / feature / improvement), status (suggested / voting / ready / in-progress / done / archived)
+- Filter bar: app (all / Opinion Market / Last One Wins / Falling Sands / ...), category (all / bug / feature / improvement), status (suggested / voting / ready / in-progress / done / archived)
 - Sort: most votes, highest priority, newest, trending (recent vote velocity)
 - Each issue card shows: title, app badge, category badge, report count (confirmed groupings), AI priority stars, vote bar (yes/no), quorum progress, pipeline status
 - Issues at or near threshold are highlighted
@@ -930,7 +930,7 @@ The widget needs the bridge to be loaded first (it calls `sendTransaction`). It 
 The 1024-char memo limit constrains feedback length. Budget breakdown for a `submit` transaction:
 
 ```json
-{"app":"feedback","type":"submit","target_app":"him","category":"bug","text":"..."}
+{"app":"feedback","type":"submit","target_app":"opinion-market","category":"bug","text":"..."}
 ```
 
 JSON overhead: ~75 chars. Leaves ~949 chars for `text`. This is sufficient for most feedback.
@@ -953,7 +953,7 @@ Grouping transactions are lightweight:
 
 5. **Notification**: Manual for v1 — users check the Hub to see status of their feedback. Widget-based notification badges are a Phase 4 enhancement.
 
-6. **Rate limiting**: Yes — max 5 feedback submissions per address per day, enforced on read (same pattern as HIM's survey creation rate limit).
+6. **Rate limiting**: Yes — max 5 feedback submissions per address per day, enforced on read (same pattern as Opinion Market's survey creation rate limit).
 
 7. **LLM choice**: The AI collation layer (Hub Server) uses `LLM_API_KEY` and is model-agnostic. The coding agent uses `claude-code-action` (Claude lock-in at the Action layer, but trivially swappable — see #14).
 
@@ -1003,7 +1003,7 @@ The Feedback Hub uses this module for displaying usernames on feedback submissio
 **Repo: `usernode-dapp-starter`**
 - Build `usernode-feedback.js` widget
 - Add serving route in `server.js` and `examples/server.js`
-- Embed in all existing dapps (HIM, Last One Wins, Falling Sands, starter)
+- Embed in all existing dapps (Opinion Market, Last One Wins, Falling Sands, starter)
 - Feedback submissions go on-chain
 
 **Repo: `usernode-feedback-hub` (create)**
