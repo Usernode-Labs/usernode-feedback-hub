@@ -1,3 +1,0 @@
-[submodule "examples/falling-sands/sandspiel"]
-	path = examples/falling-sands/sandspiel
-	url = git@github.com:MaxBittker/sandspiel.git

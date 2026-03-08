@@ -99,29 +99,6 @@ When loaded inside the app, the bridge detects the native environment and routes
 
 ---
 
-## Examples
-
-The `examples/` directory contains reference dapps:
-
-| Example | Description |
-|---|---|
-| [`examples/him/`](examples/him/) | Human Input Market — prediction-market-powered surveys and voting |
-| [`examples/last-one-wins/`](examples/last-one-wins/) | Token game — last sender before the timer expires wins the pot |
-| [`examples/falling-sands/`](examples/falling-sands/) | Multiplayer falling-sands simulation with WASM + WebSocket |
-
-Run the combined examples server:
-
-```bash
-cd examples
-cp ../usernode-bridge.js .
-cp ../index.html .
-node server.js --local-dev
-```
-
-Or run any sub-app independently (e.g., `cd examples/last-one-wins && node server.js --local-dev`).
-
----
-
 ## Building your own dapp (manual)
 
 1. Edit `index.html` (or create a new HTML file at root).
